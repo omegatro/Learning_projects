@@ -1,0 +1,323 @@
+Idea: Reference sequence database for local use 
+    - a fasta file that stores bacterial reference genomes (nt) (header contains only accession number)
+    - a taxonomy file that stores information about (Phylum|Class|Order|Family|Genus|Species) for every record in fasta file
+    - a count-by-group file that stores number of records by taxonomic group for faster visuzlization
+
+Basic functions:
+    Add sequence(s) to the file + records to the taxonomy file
+        - Download from ncbi - e.g. via entrezDirect(https://www.ncbi.nlm.nih.gov/books/NBK179288/)
+        - Add from fasta/multifasta file + metadata list (csv)
+
+    Export data
+        - Export sequence(s) in fasta format
+        - Export sequence information from taxonomy file in csv format
+        - Export both
+
+    Remove sequence(s) from file
+        - Remove taxonomy information as well
+
+    Edit records in the database
+        - Access records by accession number
+        - Change fasta header
+        - Change taxonomic information
+
+    Sequence metadata
+        - update taxonomy file when records are added/removed/edited
+        - update count-by-group file when records are added/removed/edited
+    
+    Log any performed (file-editing) action in a way to allow rollback
+        - E.g. store list of added accession numbers and dates when they were added
+    
+    View records that are currently in the file
+        - visualize the content of database
+            - total number of records
+            - count of records by taxonomic groups - from count-by-group file (treeplot)
+
+Technologies:
+    Interface: python argparse
+        -links
+            https://stackoverflow.com/questions/5403138/how-to-set-a-default-editable-string-for-raw-input
+    Back-end:
+        - ncbi api - entrezDirect biopython wrapper
+            -links
+                https://biopython.org/docs/latest/api/Bio.Entrez.html
+                https://people.duke.edu/~ccc14/pcfb/biopython/BiopythonEntrez.html
+                https://www.ncbi.nlm.nih.gov/genbank/samplerecord/
+                https://www.ncbi.nlm.nih.gov/books/NBK25499/table/chapter4.T._valid_values_of__retmode_and/?report=objectonly
+        - operate on fasta file - biopython
+            -links
+                https://biopython.org/wiki/SeqIO
+        - operate on csv files - python pandas
+        - generate plot - python plotly
+            -links
+                https://plotly.com/python/tree-plots/
+        - log generation - python
+            -links
+                https://realpython.com/python-logging/#the-logging-module
+        - OOP python
+            - links
+                https://realpython.com/python3-object-oriented-programming/
+
+
+Architecture:
+
+    Classes:
+        Interface
+            check_format(String raw_accession)
+                return Bool format_valid
+            check_alphabet(String raw_accession)
+                return Bool alphabet_valid
+            check_csv(String file_name)
+                return Bool file_name_valid
+            read_local(String valid_accession, String local_fasta, String taxonomy)
+                return String local_fasta, String taxonomy
+            print_tax(String taxonomy)
+
+        Database
+            add_record_ncbi(String valid_accession, String ncbi_fasta, String ncbi_tax)
+            add_record_local(String valid_accession, String local_fasta, String taxonomy)
+            recalculate_content(String count_by_group_path)
+            check_duplicate(String valid_accession)
+                return Bool dup_check
+            find_id(String valid_accession)
+                return Bool found_check
+            rm_record(String valid_accession)
+            write_tax(String valid_accession,String new_taxonomy)
+            write_id(String old_accession,String new_accession)
+            export_fasta(String valid_accession)
+                CREATES "datestamp-export-sequences.fasta"
+            export_meta(String valid_accession)
+                CREATES "datestamp-export-metadata.csv"
+            export_record(String valid_accession)
+                CREATES "datestamp-export-metadata.csv"
+                CREATES "datestamp-export-sequences.fasta"
+            find_tax(String valid_accession)
+                return String taxonomy
+
+        Query_ncbi
+            check_output(String valid_accession)
+                return Bool output_check
+            get_fasta(String valid_accession)
+                return String ncbi_fasta
+            get_taxonomy(String valid_accession)
+                return String ncbi_tax
+        Logger
+            log_change(String valid_accession, String taxonomy, String old_accession, String old_taxonomy, String new_accession, String new_taxonomy, String operation_type)
+
+        Plotter
+            display(String path_to_count_file)
+
+
+    Interface class:
+        - help - show script purpose and help message describing purpose of each parameter
+
+        - add-fasta - path to fasta/multifasta to add sequences from
+            - meta - path to csv file containing metadata for sequences to be added from fasta file (required if -add-fasta is invoked)
+                - read records from csv and regex-validate each id
+                - alphabet-validate each sequence in fasta file
+            - interactions
+                - INVOKES read_local() method of the Interface/self class
+                    - PASSES the valid_accession variable (String)
+                    - RETURNS the local_fasta variable (String)
+                    - RETURNS the taxonomy variable (String)
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                - INVOKES check_alphabet() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the alphabet_valid variable (Bool)
+                - INVOKES add_record_local() method of Database class
+                    - PASSES the local_fasta variable (String)
+                    - PASSES the valid_accession variable (String)
+                    - PASSES the taxonomy variable (String)
+                - INVOKES recalculate_content() method of the Database class
+                    - PASSES the path to count-by-group file (String)
+                - INVOKES log_change() method of the Logger class
+                    - PASSES valid_accession variable (String)
+                    - PASSES taxonomy variable (String)
+                    - PASSES operation_type (String)
+
+        - add-ncbi - valid accession number to use in entrez search (RefSeq database nt format only)
+            - regex-based validation of an id - assure that format is correct
+            - output-based validation - assure that RefSeq record exist
+            - request timeout exception handling
+            - interactions
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                - INVOKES check_output() method of the Query_ncbi class
+                    - PASSES the valid_accession variable (String)
+                    - RETURNS the output_check variable value (Bool)
+                - INVOKES get_fasta() method of the Query_ncbi class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the ncbi_fasta variable value (String)
+                - INVOKES get_taxonomy() method of the Query_ncbi class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the ncbi_tax variable value (String)
+                - INVOKES add_record_ncbi() method of the Database class
+                    - PASSES the valid_accession variable (String) 
+                    - PASSES the ncbi_fasta variable (String)
+                    - PASSES the ncbi_tax variable (String)
+                - INVOKES recalculate_content() method of the Database class
+                    - PASSES the path to count-by-group file (String)
+                - INVOKES log_change() method of the Logger class
+                    - PASSES valid_accession variable (String)
+                    - PASSES operation_type (String)
+
+        - add-ncbi-list - path to csv file containing valid accession numbers to use in entrez search (RefSeq database format only)
+            - check if input file format is correct (csv)
+            - read records from csv and regex-validate each record
+            - duplicate-validate each record
+            - output-validate each record and store the accession, taxonomy and sequence
+            - request timeout exception handling
+            - interactions
+                - INVOKES check_csv() method of the Interface/self class
+                    - PASSES the file_name variable (String)
+                    - RETURNS the file_name_valid variable (Bool)
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                 - INVOKES check_duplicate() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the dup_check variable value (Bool)
+                - INVOKES check_output() method of the Query_ncbi class
+                    - PASSES the valid_accession variable (String)
+                    - RETURNS the output_check variable value (Bool)
+                - INVOKES get_fasta() method of the Query_ncbi class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the ncbi_fasta variable value (String)
+                - INVOKES get_taxonomy() method of the Query_ncbi class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the ncbi_tax variable value (String)
+                - INVOKES add_record_ncbi() method of the Database class
+                    - PASSES the valid_accession variable (String) 
+                    - PASSES the ncbi_fasta variable (String)
+                    - PASSES the ncbi_tax variable (String)
+                - INVOKES recalculate_content() method of the Database class
+                    - PASSES the path to count-by-group file (String)
+                - INVOKES log_change() method of the Logger class
+                    - PASSES valid_accession variable (String)
+                    - PASSES operation_type (String)
+
+        - exp-fasta - path to csv file containing valid accession numbers to find specific record in local database
+            - check if input file format is correct (csv)
+            - read records from csv and regex-validate each record
+            - existance test - assure that id can be found in local database
+            - export fasta/multifasta containing sequences that were found in the database based on query list (excluding invalid/existance test outliers)
+            - interactions
+                - INVOKES check_csv() method of the Interface/self class
+                    - PASSES the file_name variable (String)
+                    - RETURNS the file_name_valid variable (Bool)
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                - INVOKES find_id() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the found_check variable value (Bool)
+                - INVOKES export_fasta() method of the Database class
+                    - PASSES the valid_accession variable (String) 
+                    - EXPECTS "datestamp-export-sequences.fasta" file containing found sequences
+                
+        - exp-meta - path to csv file containing valid accession numbers to find specific record in local database
+            - check if input file format is correct (csv)
+            - read records from csv and regex-validate each record
+            - existance test - assure that id can be found in local database
+            - export csv containing taxonomic data for records that were found in the database based on query list (excluding invalid/existance test outliers)
+            - interactions
+                - INVOKES check_csv() method of the Interface/self class
+                    - PASSES the file_name variable (String)
+                    - RETURNS the file_name_valid variable (Bool)
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                - INVOKES find_id() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the found_check variable value (Bool)
+                - INVOKES export_meta() method of the Database class
+                    - PASSES the valid_accession variable (String) 
+                    - EXPECTS "datestamp-export-metadata.csv" file containing found ids matched by taxonomic data
+
+        - exp-records - path to csv file containing valid accession numbers to find specific record in local database
+            - check if input file format is correct (csv)
+            - read records from csv and regex-validate each record
+            - existance test - assure that id can be found in local database
+            - export csv containing taxonomic data AND fasta/multifasta containing sequences for IDS that were found in the database  based on query list (excluding invalid/existance test outliers)
+            - interactions
+                - INVOKES check_csv() method of the Interface/self class
+                    - PASSES the file_name variable (String)
+                    - RETURNS the file_name_valid variable (Bool)
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                - INVOKES find_id() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the found_check variable value (Bool)
+                - INVOKES export_record() method of the Database class
+                    - PASSES the valid_accession variable (String) 
+                    - EXPECTS "datestamp-export-metadata.csv" file containing found ids matched by taxonomic data & "datestamp-export-sequences.fasta" file containing found sequences
+
+        - rm-record - valid accession number to find specific record in local database/path to csv file containing valid accession numbers to find specific record in local database
+            - check if input file format is correct (csv)
+            - regex-based validation of an id - assure that format is correct
+            - existance test - assure that id can be found in local database
+            - confirmation prompt (y/n) before removing the information (if csv is passed - selection option - batch or confirm for each record)
+            - interactions
+                - INVOKES(?) check_csv() method of the Interface/self class
+                    - PASSES the file_name variable (String)
+                    - RETURNS the file_name_valid variable (Bool)
+                - INVOKES check_format() method of the Interface/self class
+                    - PASSES the raw_accession variable (String)
+                    - RETURNS the format_valid variable (Bool)
+                - INVOKES find_id() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the found_check variable value (Bool)
+                - INVOKES rm_record() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                - INVOKES recalculate_content() method of the Database class
+                    - PASSES the path to count-by-group file (String)
+                - INVOKES log_change() method of the Logger class
+                    - PASSES valid_accession variable (String)
+                    - PASSES operation_type (String)
+
+
+        - ch-header - valid accession number to find specific record in local database
+            - existance test - assure that id can be found in database
+            - input prompt - allow user to enter new information for specific record
+                - by-default should provide current accession string to edit
+                - confirmation prompt (y/n) before changing the information
+            - interactions
+                - INVOKES find_id() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the found_check variable value (Bool)
+                - INVOKES write_id() method of the Database class
+                    - PASSES old_accession and new_accession variables (String/String)
+                - INVOKES log_change() method of the Logger class
+                    - PASSES valid_accession and new_accession variable (String/String)
+                    - PASSES operation_type (String)
+
+        - ch-tax - valid accession number to find specific record in local database
+            - existance test - assure that id can be found in database
+            - current data - print current taxonomy information to std
+            - input prompt - allow user to enter new information for specific record
+                - by-default should provide current taxonomy data string to edit
+            - confirmation prompt (y/n) before changing the information
+            - interactions
+                - INVOKES find_id() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS the found_check variable value (Bool)
+                - INVOKES find_tax() method of the Database class
+                    - PASSES the valid_accession variable (String)
+                    - EXPECTS taxonomy variable (String)
+                - INVOKES print_tax() method of the Interface/self class
+                    - PASSES the taxonomy variable (String)
+                - INVOKES write_tax() method of the Database class
+                    - PASSES the valid_accession variable and new_taxonomy variable (String/String)
+                - INVOKES log_change() method of the Logger class
+                    - PASSES valid_accession variable (String)
+                    - PASSES old_taxonomy and new_taxonomy variables (String/String)
+                    - PASSES operation_type (String)
+
+        - view-data - static flag to display plot that summarizes database content (number of records by taxonomic group)
+            interactions
+                - INVOKES display() method of the Plotter class
+                    - PASSES the path to count-by-group file (String)

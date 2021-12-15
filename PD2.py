@@ -1,7 +1,9 @@
-import sys, argparse, re, logging, urllib, pandas as pd
+import sys, argparse, re, logging, urllib, pandas as pd,  plotly.graph_objects as go
 from pathlib import Path
 from Bio import Entrez, SeqIO
 from Bio.Seq import Seq
+from igraph import Graph, EdgeSeq
+
 
 class Interface:
     def __init__(self, alphabet, valid_input_type, accession_pattern):
@@ -91,25 +93,63 @@ class Database:
         '''Method is used to calculate current database content by taxonomic group and store in a file.'''
         tax_db = pd.read_csv(self.taxomony_file, header=[0])
         split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
-        #number of levels = number of columns
-        #number of nodes on each rows = number of unique records in each column
-        #linkage between taxonomy groups = number of unique column-column pairs between adjecent columns
-        #{l1:{l2:{l3:{l4:l5}}}}}
-        #Go through all rows 
-        #If 0 is not in dict
-            # add full tree to dict (initialize dict)
-        #If 1 is not in dict[0]
-            # add to tree with key 0
-        #IF 2 is not in dict[0][1]
-            # add to tree with key 1
-        #...
-        #IF n is not in dict[0]...[n-1]
-            #add to tree with key n-1
-        #IF n is NA - continue
-        #count number of records by each groups
-        #in format {0:[count,{1:[count_1,{...;[count_n]}]}]}
+
+        adj_set = set()
+        count_dict = {}
+        for col in split_product.columns:
+            count_dict.update(dict(split_product[col].value_counts()))
+        encode_dict = {node:i for i,node in enumerate(count_dict.keys())}
         
-        print(split_product)
+        split_product = split_product.drop_duplicates()
+        for i in range(len(split_product.columns)):
+            for j in range(len(split_product.iloc[:,i])):
+                if i+1 != len(split_product.columns):
+                    adj_set.add((encode_dict[split_product.iloc[j,i]], encode_dict[split_product.iloc[j,i+1]]))
+
+        nr_vertices = len(count_dict.keys())
+        v_label = [f'{key}: {count_dict[key]}' for key in count_dict.keys()]
+        graph = Graph()
+        graph.add_vertices(nr_vertices)
+        graph.add_edges(list(adj_set))
+        lay = graph.layout('rt')
+        max_y = max([lay[k][1] for k in range(nr_vertices)])
+
+        es = EdgeSeq(graph) # sequence of edges
+        E = [e.tuple for e in graph.es] # list of edges
+
+        Xn = [lay[k][0] for k in range(nr_vertices)]
+        Yn = [2*max_y-lay[k][1] for k in range(nr_vertices)]
+        Xe = []
+        Ye = []
+        for edge in E:
+            Xe+=[lay[edge[0]][0],lay[edge[1]][0], None]
+            Ye+=[2*max_y-lay[edge[0]][1],2*max_y-lay[edge[1]][1], None]
+
+        labels = v_label
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=Xe, y=Ye, mode='lines', line=dict(color='rgb(210,210,210)', width=1), hoverinfo='none'))
+        fig.add_trace(go.Scatter(x=Xn, y=Yn, mode='markers', name='bla', marker=dict(symbol='circle-dot', size=100, color='#6175c1',    #'#DB4551',
+                                        line=dict(color='rgb(50,50,50)', width=1)), text=labels, hoverinfo='text', opacity=0.8))
+
+
+        def make_annotations(pos, text, font_size=15, font_color='rgb(0,0,0)'):
+            L=len(pos)
+            if len(text)!=L:
+                raise ValueError('The lists pos and text must have the same len')
+            annotations = []
+            for k in range(L):
+                annotations.append(
+                    # or replace labels with a different list for the text within the circle
+                    dict(text=labels[k], x=pos[k][0], y=2*max_y-lay[k][1], xref='x1', yref='y1', font=dict(color=font_color, size=font_size), showarrow=False)
+                )
+            return annotations
+
+        axis = dict(showline=False, zeroline=False, showgrid=False, showticklabels=False,) # hide axis line, grid, ticklabels and  title
+
+        fig.update_layout(title= 'Local database summary', annotations=make_annotations(lay, v_label), font_size=14, showlegend=False,
+                      xaxis=axis, yaxis=axis, margin=dict(l=40, r=40, b=85, t=100), hovermode='closest', plot_bgcolor='rgb(143, 150, 196)')
+        fig.show()
+        
 
     def find_id(self, valid_accession):
         '''Method is used to check if given id exists in the database.'''
@@ -255,7 +295,11 @@ class Plotter:
 
 if __name__ == "__main__":
     my_database = Database("test_database")
-    my_database.create_db_files()
-    for _ in range(10):
-        my_database.add_record("test_header","ACGT", "|".join(['Bacteria', 'Proteobacteria', 'Betaproteobacteria', 'Neisseriales', 'Neisseriaceae', 'Neisseria']),"test_description")
+    # my_database.create_db_files()
+    my_q = Query_ncbi('nucleotide','jb17048@edu.lu.lv', 'ACGT')
+    # my_database.add_record("test_header","ACGT", "|".join(['Bacteria', 'Proteobacteria', 'Betaproteobacteria', 'Neisseriales', 'Neisseriaceae', 'Neisseria']),"test_description")
+    # my_database.add_record("NZ_CP021325", my_q.get_fasta("NZ_CP021325")[0], "|".join(my_q.get_taxonomy("NZ_CP021325")),'test_description')
+    # my_database.add_record("NZ_CP015941", my_q.get_fasta("NZ_CP015941")[0], "|".join(my_q.get_taxonomy("NZ_CP015941")),'test_description')
+    # my_database.add_record("AP018036", my_q.get_fasta("AP018036")[0], "|".join(my_q.get_taxonomy("AP018036")),'test_description')
+    # my_database.add_record("AL157959", my_q.get_fasta("AL157959")[0], "|".join(my_q.get_taxonomy("AL157959")),'test_description')
     my_database.calculate_content()

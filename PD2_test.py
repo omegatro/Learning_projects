@@ -87,11 +87,17 @@ class TestDatabaseMethods(unittest.TestCase):
         os.remove(my_database.sequence_file)
         os.remove(my_database.taxomony_file)
         
-    
     def test_Database_find_id(self):
         my_database.create_db_files()
         my_database.add_record("test_header","ACGT", "test_taxonomy_string","test_description")
         self.assertTrue(my_database.find_id("test_header"))
+        os.remove(my_database.sequence_file)
+        os.remove(my_database.taxomony_file)
+
+    def test_Database_find_tax(self):
+        my_database.create_db_files()
+        my_database.add_record("test_header","ACGT","test_taxonomy_string","test_description")
+        self.assertEqual(my_database.find_tax("test_header"), "test_taxonomy_string")
         os.remove(my_database.sequence_file)
         os.remove(my_database.taxomony_file)
 
@@ -102,13 +108,37 @@ class TestDatabaseMethods(unittest.TestCase):
         my_database.rm_record("test_header")
         test_tax_record = ["test_header_1","test_taxonomy_string_1"]
         with open(my_database.sequence_file, "r+") as seq_db:
-            seq_record = SeqIO.read(my_database.sequence_file, format="fasta")
+            seq_record = SeqIO.read(seq_db, format="fasta")
             self.assertEqual(seq_record.id, "test_header_1")
             self.assertEqual(seq_record.seq, "ACGT_1")
             self.assertEqual(seq_record.description.split(" ")[-1], "test_description_1")
         tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
         self.assertEqual(tax_db["accession_number"][0], test_tax_record[0])
         self.assertEqual(tax_db["taxonomy_string"][0], test_tax_record[1])
+        os.remove(my_database.sequence_file)
+        os.remove(my_database.taxomony_file)
+
+    def test_Database_write_tax(self):
+        my_database.create_db_files()
+        my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
+        my_database.write_tax("test_header", "replaced_test_taxonomy_string")
+        test_tax_record = ["test_header","replaced_test_taxonomy_string"]
+        tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
+        self.assertEqual(tax_db["accession_number"][0], test_tax_record[0])
+        self.assertEqual(tax_db["taxonomy_string"][0], test_tax_record[1])
+        os.remove(my_database.sequence_file)
+        os.remove(my_database.taxomony_file)
+
+    def test_Database_write_id(self):
+        my_database.create_db_files()
+        my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
+        my_database.write_id("test_header", "replaced_test_header")
+        test_tax_record = "replaced_test_header"
+        with open(my_database.sequence_file, "r+") as seq_db:
+            seq_record = SeqIO.read(seq_db, format="fasta")
+            self.assertEqual(seq_record.id, "replaced_test_header")
+        tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
+        self.assertEqual(tax_db["accession_number"][0], test_tax_record)
         os.remove(my_database.sequence_file)
         os.remove(my_database.taxomony_file)
 

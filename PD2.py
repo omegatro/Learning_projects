@@ -1,7 +1,8 @@
-import sys, argparse, re, logging, urllib, pandas as pd
+import sys, argparse, re, logging, urllib, pandas as pd, igraph
 from pathlib import Path
 from Bio import Entrez, SeqIO
 from Bio.Seq import Seq
+
 
 class Interface:
     def __init__(self, alphabet, valid_input_type, accession_pattern):
@@ -51,8 +52,7 @@ class Interface:
 
     def check_file_type(self, file_name):
         '''Method checks if provided file type matches allowed file type.'''
-        if file_name.endswith(f'.{self.valid_input_type}'): return True
-        else: return False
+        return file_name.endswith(f'.{self.valid_input_type}')
 
     def read_local(self, valid_accession):
         #Database class required to test.
@@ -88,13 +88,23 @@ class Database:
         tax_db.to_csv(self.taxomony_file, index=False)
         
 
-    def calculate_content(self, count_by_group_path):
+    def calculate_content(self, count_by_group_path=None):
+        '''Method is used to calculate current database content by taxonomic group and store in a file.'''
+        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db['taxonomy_string'].str.split(expand=True)
         pass
+
     def find_id(self, valid_accession):
         '''Method is used to check if given id exists in the database.'''
         tax_db = pd.read_csv(self.taxomony_file, header=[0])
         if valid_accession in list(tax_db["accession_number"]): return True
         else: return False
+
+    def find_tax(self, valid_accession):
+        '''Method is used to get taxonomy information of a record in the database.'''
+        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
+        return tax_db.iloc[accession_ind].loc['taxonomy_string']
 
     def rm_record(self, valid_accession):
         '''Method is used to remove a record from local database based on accession number.'''
@@ -107,9 +117,26 @@ class Database:
         tax_db.to_csv(self.taxomony_file, index=False)
 
     def write_tax(self, valid_accession, new_taxonomy):
-        pass
+        '''Method is used to replace a taxonomy information of a record in the database.'''
+        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
+        tax_db.at[accession_ind,'taxonomy_string']=new_taxonomy
+        tax_db.to_csv(self.taxomony_file, index=False)
+
     def write_id(self, old_accession, new_accession):
-        pass
+        '''Method is used to replace an accession of a record in the database.'''
+        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        seq_db = SeqIO.to_dict(SeqIO.parse(self.sequence_file, "fasta"))
+        accession_ind = tax_db.index[tax_db["accession_number"] == old_accession].to_list()[0]
+        tax_db.at[accession_ind,'accession_number']=new_accession
+        seq_db[new_accession] = seq_db[old_accession]
+        del seq_db[old_accession]
+        seq_db[new_accession].id = new_accession
+        with open(self.sequence_file, "w+") as seq_db_file:
+            SeqIO.write(seq_db.values(), seq_db_file, "fasta")
+        tax_db.to_csv(self.taxomony_file, index=False)
+
+
     def export_fasta(self, valid_accession):
         #CREATES "datestamp-export-sequences.fasta"
         pass           
@@ -120,10 +147,6 @@ class Database:
         #CREATES "datestamp-export-metadata.csv"
         #CREATES "datestamp-export-sequences.fasta"
         pass
-    def find_tax(self, valid_accession):
-        #https://stackoverflow.com/questions/17071871/how-do-i-select-rows-from-a-dataframe-based-on-column-values
-        taxonomy = ""
-        return  taxonomy
 
 
 class Query_ncbi:

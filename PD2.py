@@ -1,8 +1,7 @@
-import sys, argparse, re, logging, urllib, pandas as pd, igraph
+import sys, argparse, re, logging, urllib, pandas as pd
 from pathlib import Path
 from Bio import Entrez, SeqIO
 from Bio.Seq import Seq
-
 
 class Interface:
     def __init__(self, alphabet, valid_input_type, accession_pattern):
@@ -91,8 +90,26 @@ class Database:
     def calculate_content(self, count_by_group_path=None):
         '''Method is used to calculate current database content by taxonomic group and store in a file.'''
         tax_db = pd.read_csv(self.taxomony_file, header=[0])
-        tax_db['taxonomy_string'].str.split(expand=True)
-        pass
+        split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
+        #number of levels = number of columns
+        #number of nodes on each rows = number of unique records in each column
+        #linkage between taxonomy groups = number of unique column-column pairs between adjecent columns
+        #{l1:{l2:{l3:{l4:l5}}}}}
+        #Go through all rows 
+        #If 0 is not in dict
+            # add full tree to dict (initialize dict)
+        #If 1 is not in dict[0]
+            # add to tree with key 0
+        #IF 2 is not in dict[0][1]
+            # add to tree with key 1
+        #...
+        #IF n is not in dict[0]...[n-1]
+            #add to tree with key n-1
+        #IF n is NA - continue
+        #count number of records by each groups
+        #in format {0:[count,{1:[count_1,{...;[count_n]}]}]}
+        
+        print(split_product)
 
     def find_id(self, valid_accession):
         '''Method is used to check if given id exists in the database.'''
@@ -136,17 +153,27 @@ class Database:
             SeqIO.write(seq_db.values(), seq_db_file, "fasta")
         tax_db.to_csv(self.taxomony_file, index=False)
 
-
     def export_fasta(self, valid_accession):
-        #CREATES "datestamp-export-sequences.fasta"
-        pass           
-    def export_meta(self, valid_accession):
-        #CREATES "datestamp-export-metadata.csv"
-        pass
+        '''Method is used to export single sequence in a form of SeqIO record.'''
+        seq_db = SeqIO.to_dict(SeqIO.parse(self.sequence_file, "fasta"))
+        requested_seq = seq_db[valid_accession]
+        return requested_seq
+               
+    def export_tax(self, valid_accession):
+        '''Method is used to export single taxonomy record in a form of numpy.Series'''
+        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
+        requested_tax = tax_db.iloc[accession_ind]
+        return requested_tax
+
     def export_record(self, valid_accession):
-        #CREATES "datestamp-export-metadata.csv"
-        #CREATES "datestamp-export-sequences.fasta"
-        pass
+        '''Method is used to export single sequence in a form of SeqIO record and corresponding taxonomy record in a form of numpy.Series'''
+        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        seq_db = SeqIO.to_dict(SeqIO.parse(self.sequence_file, "fasta"))
+        accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
+        requested_tax = tax_db.iloc[accession_ind]
+        requested_seq = seq_db[valid_accession]
+        return requested_tax, requested_seq
 
 
 class Query_ncbi:
@@ -227,4 +254,8 @@ class Plotter:
 
 
 if __name__ == "__main__":
-    pass
+    my_database = Database("test_database")
+    my_database.create_db_files()
+    for _ in range(10):
+        my_database.add_record("test_header","ACGT", "|".join(['Bacteria', 'Proteobacteria', 'Betaproteobacteria', 'Neisseriales', 'Neisseriaceae', 'Neisseria']),"test_description")
+    my_database.calculate_content()

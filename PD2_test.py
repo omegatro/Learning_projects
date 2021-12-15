@@ -69,7 +69,6 @@ class TestDatabaseMethods(unittest.TestCase):
         os.remove(my_database.sequence_file)
         os.remove(my_database.taxomony_file)
 
-
     def test_Database_add_record(self):
         my_database.create_db_files()
         my_database.add_record("test_header","ACGT", "test_taxonomy_string","test_description")
@@ -139,6 +138,31 @@ class TestDatabaseMethods(unittest.TestCase):
             self.assertEqual(seq_record.id, "replaced_test_header")
         tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
         self.assertEqual(tax_db["accession_number"][0], test_tax_record)
+        os.remove(my_database.sequence_file)
+        os.remove(my_database.taxomony_file)
+
+    def test_Database_export_fasta(self):
+        my_database.create_db_files()
+        my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
+        exported_seq = my_database.export_fasta("test_header")
+        self.assertEqual(exported_seq.id, "test_header")
+        os.remove(my_database.sequence_file)
+        os.remove(my_database.taxomony_file)
+
+    def test_Database_export_meta(self):
+        my_database.create_db_files()
+        my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
+        exported_tax = my_database.export_tax("test_header")
+        self.assertEqual(exported_tax["taxonomy_string"], "test_taxonomy_string")
+        os.remove(my_database.sequence_file)
+        os.remove(my_database.taxomony_file)
+
+    def test_Database_export_record(self):
+        my_database.create_db_files()
+        my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
+        export_record = my_database.export_record("test_header")
+        self.assertEqual(export_record[1].id, "test_header")
+        self.assertEqual(export_record[0]["taxonomy_string"], "test_taxonomy_string")
         os.remove(my_database.sequence_file)
         os.remove(my_database.taxomony_file)
 

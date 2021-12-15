@@ -50,7 +50,8 @@ Technologies:
         - operate on csv files - python pandas
         - generate plot - python plotly
             -links
-                https://plotly.com/python/tree-plots/
+                https://anytree.readthedocs.io/en/latest/
+                https://mljar.com/blog/visualize-decision-tree/
         - log generation - python
             -links
                 https://realpython.com/python-logging/#the-logging-module

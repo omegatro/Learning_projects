@@ -1,11 +1,13 @@
 import unittest, os, pandas as pd
 from datetime import datetime
 from Bio import SeqIO
+from Bio.Seq import Seq
 from PD2 import Interface, Logger, Query_ncbi, Database
 
 class TestInterfaceMethods(unittest.TestCase):
     global my_interface 
     my_interface = Interface("ACGT","csv", r"^[A-z]{2}_[A-Z0-9]*$")
+    
     def test_Interface_check_format(self):
         valid_accession_list = [
         "AC_1234567", "NC_1234567", "NG_1234567", "NT_1234567",
@@ -26,7 +28,20 @@ class TestInterfaceMethods(unittest.TestCase):
         my_interface = Interface("ACGT","csv", r"^[A-z]{2}_[0-9]*$")
         self.assertTrue(my_interface.check_alphabet("ACGTTTTGCCATGGTAC"))
         self.assertFalse(my_interface.check_alphabet("RGHATGCNTKLFR"))
-
+    
+    def test_Interface_read_local(self):
+        test_output_df = pd.DataFrame.from_dict({'accession_number':['NZ_CP021325'],'taxonomy_string':['Bacteria|Firmicutes|Bacilli|Bacillales|Listeriaceae|Listeria']})
+        test_output_fasta = SeqIO.SeqRecord(Seq('GTGTTTGGATAACCTTATCCATAGCTTTTTCTATCTGTGGATAACTTTATAGCATCCATTTACATTACATAAAAAGGGGGGGTACTAGTGCAATCAATTGAAGACATCTGGCAGGAAACA'),id='NZ_CP021325', description='test_description')
+        test_output_df.to_csv('test_file.csv', index=False, header=True)
+        with open('test_file.fasta', "a+") as seq_db:
+            SeqIO.write(test_output_fasta, seq_db, "fasta")
+        output = my_interface.read_local("test_file")
+        self.assertTrue(output[0]['NZ_CP021325'].id == test_output_fasta.id)
+        self.assertTrue(output[0]['NZ_CP021325'].seq == test_output_fasta.seq)
+        self.assertTrue(output[0]['NZ_CP021325'].description == 'NZ_CP021325 test_description')
+        self.assertTrue(output[1].equals(test_output_df))
+        os.remove('test_file.csv')
+        os.remove('test_file.fasta')
 
 class TestLoggerMethods(unittest.TestCase):
     def test_Logger_log_change_convention(self):

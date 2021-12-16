@@ -118,7 +118,7 @@ Architecture:
                 - alphabet-validate each sequence in fasta file
             - interactions
                 - INVOKES read_local() method of the Interface/self class
-                    - PASSES the valid_accession variable (String)
+                    - PASSES the file_name variable (String)
                     - RETURNS the local_fasta variable (String)
                     - RETURNS the taxonomy variable (String)
                 - INVOKES check_format() method of the Interface/self class

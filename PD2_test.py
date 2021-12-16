@@ -1,4 +1,5 @@
 import unittest, os, pandas as pd
+from pathlib import Path
 from datetime import datetime
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -21,8 +22,11 @@ class TestInterfaceMethods(unittest.TestCase):
         self.assertFalse(my_interface.check_format(invalid_accession))
 
     def test_Interface_check_file_type(self):
-        self.assertTrue(my_interface.check_file_type("file.csv"))
-        self.assertFalse(my_interface.check_file_type("file.tsv"))
+        Path('file.csv').touch(exist_ok=True)
+        Path('file.fasta').touch(exist_ok=True)
+        self.assertTrue(my_interface.check_file_type("file"))
+        os.remove('file.csv')
+        os.remove('file.fasta')
 
     def test_Interface_check_alphabet(self):
         my_interface = Interface("ACGT","csv", r"^[A-z]{2}_[0-9]*$")
@@ -79,10 +83,10 @@ class TestDatabaseMethods(unittest.TestCase):
     def test_Database_create_db_files(self):
         my_database.create_db_files()
         seq_file_test = os.path.exists(my_database.sequence_file) and os.path.isfile(my_database.sequence_file)
-        tax_file_test = os.path.exists(my_database.taxomony_file) and os.path.isfile(my_database.taxomony_file)
+        tax_file_test = os.path.exists(my_database.taxonomy_file) and os.path.isfile(my_database.taxonomy_file)
         self.assertTrue(seq_file_test and tax_file_test)
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_add_record(self):
         my_database.create_db_files()
@@ -92,28 +96,28 @@ class TestDatabaseMethods(unittest.TestCase):
         test_sequence = "ACGT"
         test_tax_record = ["test_header","test_taxonomy_string"]
         seq_record = SeqIO.read(my_database.sequence_file, format="fasta")
-        tax_record = pd.read_csv(my_database.taxomony_file, header=[0])
+        tax_record = pd.read_csv(my_database.taxonomy_file, header=[0])
         self.assertEqual(seq_record.seq, test_sequence)
         self.assertEqual(seq_record.id, test_id)
         self.assertEqual(seq_record.description.split(" ")[-1], test_description)
         self.assertEqual(tax_record["accession_number"][0], test_tax_record[0])
         self.assertEqual(tax_record["taxonomy_string"][0], test_tax_record[1])
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
         
     def test_Database_find_id(self):
         my_database.create_db_files()
         my_database.add_record("test_header","ACGT", "test_taxonomy_string","test_description")
         self.assertTrue(my_database.find_id("test_header"))
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_find_tax(self):
         my_database.create_db_files()
         my_database.add_record("test_header","ACGT","test_taxonomy_string","test_description")
         self.assertEqual(my_database.find_tax("test_header"), "test_taxonomy_string")
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_rm_record(self):
         my_database.create_db_files()
@@ -126,22 +130,22 @@ class TestDatabaseMethods(unittest.TestCase):
             self.assertEqual(seq_record.id, "test_header_1")
             self.assertEqual(seq_record.seq, "ACGT_1")
             self.assertEqual(seq_record.description.split(" ")[-1], "test_description_1")
-        tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
+        tax_db = pd.read_csv(my_database.taxonomy_file, header=[0])
         self.assertEqual(tax_db["accession_number"][0], test_tax_record[0])
         self.assertEqual(tax_db["taxonomy_string"][0], test_tax_record[1])
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_write_tax(self):
         my_database.create_db_files()
         my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
         my_database.write_tax("test_header", "replaced_test_taxonomy_string")
         test_tax_record = ["test_header","replaced_test_taxonomy_string"]
-        tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
+        tax_db = pd.read_csv(my_database.taxonomy_file, header=[0])
         self.assertEqual(tax_db["accession_number"][0], test_tax_record[0])
         self.assertEqual(tax_db["taxonomy_string"][0], test_tax_record[1])
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_write_id(self):
         my_database.create_db_files()
@@ -151,10 +155,10 @@ class TestDatabaseMethods(unittest.TestCase):
         with open(my_database.sequence_file, "r+") as seq_db:
             seq_record = SeqIO.read(seq_db, format="fasta")
             self.assertEqual(seq_record.id, "replaced_test_header")
-        tax_db = pd.read_csv(my_database.taxomony_file, header=[0])
+        tax_db = pd.read_csv(my_database.taxonomy_file, header=[0])
         self.assertEqual(tax_db["accession_number"][0], test_tax_record)
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_export_fasta(self):
         my_database.create_db_files()
@@ -162,7 +166,7 @@ class TestDatabaseMethods(unittest.TestCase):
         exported_seq = my_database.export_fasta("test_header")
         self.assertEqual(exported_seq.id, "test_header")
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_export_meta(self):
         my_database.create_db_files()
@@ -170,7 +174,7 @@ class TestDatabaseMethods(unittest.TestCase):
         exported_tax = my_database.export_tax("test_header")
         self.assertEqual(exported_tax["taxonomy_string"], "test_taxonomy_string")
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
     def test_Database_export_record(self):
         my_database.create_db_files()
@@ -179,7 +183,7 @@ class TestDatabaseMethods(unittest.TestCase):
         self.assertEqual(export_record[1].id, "test_header")
         self.assertEqual(export_record[0]["taxonomy_string"], "test_taxonomy_string")
         os.remove(my_database.sequence_file)
-        os.remove(my_database.taxomony_file)
+        os.remove(my_database.taxonomy_file)
 
 if __name__ == '__main__':
     unittest.main()

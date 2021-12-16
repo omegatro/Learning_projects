@@ -1,6 +1,4 @@
-from datetime import date
-from itertools import count
-import sys, argparse, re, logging, urllib, pandas as pd,  plotly.graph_objects as go, json
+import sys, argparse, re, logging, urllib, pandas as pd,  plotly.graph_objects as go, json, os
 from pathlib import Path
 from Bio import Entrez, SeqIO
 from Bio.Seq import Seq
@@ -21,14 +19,14 @@ class Interface:
         arg_dict = {
             "--add-fasta": f"Add new record(s) from locally stored fasta file & metadata file of {self.valid_input_type} format. Expected: file_name.{self.valid_input_type}",
             "--add-ncbi": f"Add new record from NCBI RefSeq database by correct accession number. Expected: valid_accession_number",
-            "--add-ncbi-list": f"Add new record(s) from NCBI RefSeq database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
+            "--add-ncbi-list": f"Add new record(s) from NCBI RefSeq database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format (single column with one header row). Expected: path_to_{self.valid_input_type}",
             "--exp-fasta": f"Create a fasta file containing sequences from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--exp-meta": f"Create a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--exp-records": f"Create a fasta file containing sequences & a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--rm-record": f"Remove records from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--ch-header": f"Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database. Expected: valid_accession_from_local_db",
             "--ch-tax": f"Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database. Expected: valid_accession_from_local_db",
-            "--view-data": "Visualize the contents of the local database as a tree chart, showing the number and percentage of records that belong to each taxonomic group."
+            "--view-data": "Visualize the contents of the local database as a tree chart, showing the number of records that belong to each taxonomic group."
         }
 
         for arg in arg_dict.keys():
@@ -41,6 +39,7 @@ class Interface:
             parser.print_help(sys.stderr)
             sys.exit(1)
         self.args = parser.parse_args()
+        return self.args
 
     def check_format(self, raw_accession):
         '''Method checks if provided accession number matches RefSeq accession number conventions.'''
@@ -56,7 +55,7 @@ class Interface:
 
     def check_file_type(self, file_name):
         '''Method checks if provided file type matches allowed file type.'''
-        return file_name.endswith(f'.{self.valid_input_type}')
+        return all([os.path.exists(f'{file_name}.{self.valid_input_type}'), os.path.exists(f'{file_name}.fasta')])
 
     def read_local(self, file_name):
         '''Method is used to read local sequence and taxonomy information.'''
@@ -69,14 +68,17 @@ class Database:
     #Finished (unit)
     def __init__(self, db_name):
         self.sequence_file = Path(f'{db_name}.fasta')
-        self.taxomony_file = Path(f'{db_name}.csv')
+        self.taxonomy_file = Path(f'{db_name}.csv')
         
     def create_db_files(self):
         '''Method is used to create database file in the directory where the script is.'''
-        self.sequence_file.touch(exist_ok=True)
-        self.taxomony_file.touch(exist_ok=True)
-        tax_file_columns = pd.DataFrame(columns=["accession_number","taxonomy_string"])
-        tax_file_columns.to_csv(self.taxomony_file, index=False, header=True)
+        try:
+            self.sequence_file.touch(exist_ok=False)
+            self.taxonomy_file.touch(exist_ok=False)
+            tax_file_columns = pd.DataFrame(columns=["accession_number","taxonomy_string"])
+            tax_file_columns.to_csv(self.taxonomy_file, index=False, header=True)
+        except:
+            print(f'Current database files: {self.sequence_file}; {self.taxonomy_file}')
 
     def add_record(self, header, sequence, taxonomy, description):
         '''Method is used to add new record to database files (taxonomy file & fasta file).'''
@@ -84,9 +86,9 @@ class Database:
         new_record_tax = pd.DataFrame.from_dict({"accession_number":[header],"taxonomy_string":[taxonomy]})
         with open(self.sequence_file, "a+") as seq_db:
             SeqIO.write(new_record_seq, seq_db, "fasta")
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         tax_db = tax_db.append(new_record_tax)
-        tax_db.to_csv(self.taxomony_file, index=False)
+        tax_db.to_csv(self.taxonomy_file, index=False)
         
     def calculate_content(self, taxonomy_string=None):
         '''Method is used to calculate current database content by taxonomic group and store in a file.'''
@@ -98,20 +100,27 @@ class Database:
             with open(f'encode_dict.json', "r+") as f3:
                 encode_dict = json.load(f3)
             adj_set = set(tuple(pair) for pair in adj_set)
-            taxonomy_list = taxonomy_string.split("|")
-            new_adj_dict = {taxonomy_list[i]:taxonomy_list[i+1] for i in range(len(taxonomy_list)-1)}
-            for taxon in taxonomy_list:
-                try:
-                    count_dict[taxon] += 1
-                    encode_dict[taxon]
-                except KeyError:
-                    encode_dict[taxon] = max(encode_dict.values()) + 1
-                    count_dict[taxon] = 1
-            for parent,child in new_adj_dict.items():
-                adj_set.add((encode_dict[parent],encode_dict[child]))
+            if taxonomy_string:
+                taxonomy_list = taxonomy_string.split("|")
+                new_adj_dict = {taxonomy_list[i]:taxonomy_list[i+1] for i in range(len(taxonomy_list)-1)}
+                for taxon in taxonomy_list:
+                    try:
+                        count_dict[taxon] += 1
+                        encode_dict[taxon]
+                    except KeyError:
+                        encode_dict[taxon] = max(encode_dict.values()) + 1
+                        count_dict[taxon] = 1
+                for parent,child in new_adj_dict.items():
+                    adj_set.add((encode_dict[parent],encode_dict[child]))
+                with open(f'adj_set.json', "w+") as file:
+                    json.dump(list(adj_set), file)
+                with open(f'count_dict.json', "w+") as file:
+                    json.dump(count_dict, file)
+                with open(f'encode_dict.json', "w+") as file:
+                    json.dump(encode_dict, file)
             return adj_set, count_dict
         except FileNotFoundError:
-            tax_db = pd.read_csv(self.taxomony_file, header=[0])
+            tax_db = pd.read_csv(self.taxonomy_file, header=[0])
             split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
             adj_set = set()
             count_dict = {}
@@ -135,36 +144,36 @@ class Database:
 
     def find_id(self, valid_accession):
         '''Method is used to check if given id exists in the database.'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         if valid_accession in list(tax_db["accession_number"]): return True
         else: return False
 
     def find_tax(self, valid_accession):
         '''Method is used to get taxonomy information of a record in the database.'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
         return tax_db.iloc[accession_ind].loc['taxonomy_string']
 
     def rm_record(self, valid_accession):
         '''Method is used to remove a record from local database based on accession number.'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         seq_db = SeqIO.to_dict(SeqIO.parse(self.sequence_file, "fasta"))
         tax_db = tax_db[tax_db["accession_number"] != valid_accession]
         del seq_db[valid_accession]
         with open(self.sequence_file, "w+") as seq_db_file:
             SeqIO.write(seq_db.values(), seq_db_file, "fasta")
-        tax_db.to_csv(self.taxomony_file, index=False)
+        tax_db.to_csv(self.taxonomy_file, index=False)
 
     def write_tax(self, valid_accession, new_taxonomy):
         '''Method is used to replace a taxonomy information of a record in the database.'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
         tax_db.at[accession_ind,'taxonomy_string']=new_taxonomy
-        tax_db.to_csv(self.taxomony_file, index=False)
+        tax_db.to_csv(self.taxonomy_file, index=False)
 
     def write_id(self, old_accession, new_accession):
         '''Method is used to replace an accession of a record in the database.'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         seq_db = SeqIO.to_dict(SeqIO.parse(self.sequence_file, "fasta"))
         accession_ind = tax_db.index[tax_db["accession_number"] == old_accession].to_list()[0]
         tax_db.at[accession_ind,'accession_number']=new_accession
@@ -173,7 +182,7 @@ class Database:
         seq_db[new_accession].id = new_accession
         with open(self.sequence_file, "w+") as seq_db_file:
             SeqIO.write(seq_db.values(), seq_db_file, "fasta")
-        tax_db.to_csv(self.taxomony_file, index=False)
+        tax_db.to_csv(self.taxonomy_file, index=False)
 
     def export_fasta(self, valid_accession):
         '''Method is used to export single sequence in a form of SeqIO record.'''
@@ -183,14 +192,14 @@ class Database:
                
     def export_tax(self, valid_accession):
         '''Method is used to export single taxonomy record in a form of numpy.Series'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
         requested_tax = tax_db.iloc[accession_ind]
         return requested_tax
 
     def export_record(self, valid_accession):
         '''Method is used to export single sequence in a form of SeqIO record and corresponding taxonomy record in a form of numpy.Series'''
-        tax_db = pd.read_csv(self.taxomony_file, header=[0])
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
         seq_db = SeqIO.to_dict(SeqIO.parse(self.sequence_file, "fasta"))
         accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
         requested_tax = tax_db.iloc[accession_ind]
@@ -244,7 +253,7 @@ class Logger:
         self.operation_type = operation_type
         self.log_file = log_file
         self.log_dict = {
-        "add_fasta":f"New record was added from fasta file (id: {valid_accession}).",
+        "add_fasta":f"New record was added from fasta file (id: {valid_accession})",
         "add_ncbi":f"New record was added from ncbi database (id: {valid_accession})",
         "rm_record":f"Record was removed (id: {valid_accession})",
         "ch_header":f"ID of the record was changed from {old_accession} to {new_accession}",
@@ -322,4 +331,118 @@ class Plotter:
 
 
 if __name__ == "__main__":
-    pass
+    
+    my_interface = Interface('ACGT', 'csv', r"^[A-z]{2}_[A-Z0-9]*$")
+    arg_dict = vars(my_interface.parse_arguments())
+
+    if any([True if arg else False for arg in arg_dict.values()]):
+        my_database = Database('my_database')
+        my_database.create_db_files()
+        my_qry = Query_ncbi('nucleotide', 'jb17048@edu.lu.lv', 'ACGT')
+
+    if arg_dict['add_fasta']:
+        file_check = my_interface.check_file_type(f'{arg_dict["add_fasta"]}')
+        if file_check:
+            records = my_interface.read_local(arg_dict['add_fasta'])
+            sequences, taxonomy = records[0], records[1]
+            for key in sequences.keys():
+                acc_nr = sequences[key].id
+                sqnc = sequences[key].seq
+                tax_ind = taxonomy.index[taxonomy['accession_number'] == key].to_list()[0]
+                tax_str = taxonomy.iloc[tax_ind]['taxonomy_string']
+                ab_check = my_interface.check_alphabet(sqnc)
+                id_check = my_interface.check_format(acc_nr)
+                dupl_check = my_database.find_id(acc_nr)
+                descr = f'from local file - {arg_dict["add_fasta"]}'
+                if all([ab_check,id_check]) and not dupl_check:
+                    my_database.add_record(acc_nr,sqnc,tax_str,descr)
+                    my_database.calculate_content(taxonomy_string=tax_str)
+                    my_logger = Logger("add_fasta",acc_nr)
+                    my_logger.log_change()
+                else:
+                    if (not ab_check) and (not id_check):
+                        sys.exit(f'Expected alphabet & Expected id pattern(regex): {my_interface.accession_pattern}|{my_interface.alphabet}')
+                    elif not ab_check:
+                        sys.exit(f'Expected alphabet: {my_interface.alphabet}')
+                    elif not id_check:
+                        sys.exit(f'Expected id pattern(regex): {my_interface.accession_pattern}')
+                    elif dupl_check:
+                        sys.exit(f'Local database already contain a sequence with given accession number.')
+                    
+        else:
+            sys.exit(f'Files with expected type do not exist. Expected:\n {arg_dict["add_fasta"]}.{my_interface.valid_input_type}\n{arg_dict["add_fasta"]}.fasta')
+
+    if arg_dict['add_ncbi']:
+        id_check = my_interface.check_format(arg_dict['add_ncbi'])
+        dupl_check = my_database.find_id(arg_dict['add_ncbi'])
+        if id_check:
+            if not dupl_check:
+                request_check = my_qry.check_output(arg_dict['add_ncbi'])
+                if request_check:
+                    output_seq = my_qry.get_fasta(arg_dict['add_ncbi'])
+                    sqnc = output_seq[0]
+                    acc_nr = arg_dict['add_ncbi']
+                    tax_str = "|".join(my_qry.get_taxonomy(arg_dict['add_ncbi']))
+                    descr = 'added from ncbi'
+                    my_database.add_record(acc_nr,sqnc,tax_str,descr)
+                    my_database.calculate_content(taxonomy_string=tax_str)
+                    my_logger = Logger("add_ncbi",valid_accession=arg_dict['add_ncbi'])
+                    my_logger.log_change()
+            else:
+                sys.exit(f'Local database already contain a sequence with given accession number.')
+        else:
+            sys.exit(f'Accession id format is not valid. Expected(regex): {my_interface.accession_pattern}')
+        
+    if arg_dict['add_ncbi_list']:
+        file_check = os.path.exists(f'{arg_dict["add_ncbi_list"]}')
+        if file_check:
+            record_list = list(pd.read_csv(arg_dict['add_ncbi_list'],header=[0]).iloc[:, 0])
+            for acc_nr in record_list:
+                id_check = my_interface.check_format(acc_nr)
+                dupl_check = my_database.find_id(acc_nr)
+                if id_check:
+                    if not dupl_check:
+                        request_check = my_qry.check_output(acc_nr)
+                        if request_check:
+                            output_seq = my_qry.get_fasta(acc_nr)
+                            sqnc = output_seq[0]
+                            tax_str = "|".join(my_qry.get_taxonomy(acc_nr))
+                            descr = 'added from ncbi'
+                            my_database.add_record(acc_nr,sqnc,tax_str,descr)
+                            my_database.calculate_content(taxonomy_string=tax_str)
+                            my_logger = Logger("add_ncbi",valid_accession=acc_nr)
+                            my_logger.log_change()
+                    else:
+                        print(f'Local database already contain a sequence with given accession number: {acc_nr}')
+                else:
+                    print(f'Accession id format is not valid: {acc_nr} Expected(regex): {my_interface.accession_pattern}')
+        else:
+            sys.exit(f'Files with expected type do not exist. Expected:\n {arg_dict["add_ncbi_list"]}.{my_interface.valid_input_type}')
+    if arg_dict['exp_fasta']:
+        pass
+
+    if arg_dict['exp_meta']:
+        pass
+
+    if arg_dict['exp_records']:
+        pass
+
+    if arg_dict['rm_record']:
+        exists = my_database.find_id(arg_dict['rm_record'])
+        if exists:
+            my_database.rm_record(arg_dict['rm_record'])
+            my_logger = Logger("rm_record", valid_accession=arg_dict['rm_record'])
+            my_logger.log_change()
+        else:
+            sys.exit('Sequence with given accession number is not stored in local database.')
+
+    if arg_dict['ch_header']:
+        pass
+
+    if arg_dict['ch_tax']:
+        pass
+
+    if arg_dict['view_data']:
+        count_data = my_database.calculate_content()
+        my_plotter = Plotter(count_data[0],count_data[1])
+        my_plotter.display()

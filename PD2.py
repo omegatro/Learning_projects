@@ -90,7 +90,7 @@ class Database:
         tax_db = tax_db.append(new_record_tax)
         tax_db.to_csv(self.taxonomy_file, index=False)
         
-    def calculate_content(self, taxonomy_string=None):
+    def calculate_content(self, taxonomy_string=None, reduce=False):
         '''Method is used to calculate current database content by taxonomic group and store in a file.'''
         try:
             with open(f'adj_set.json', "r+") as f1:
@@ -101,23 +101,41 @@ class Database:
                 encode_dict = json.load(f3)
             adj_set = set(tuple(pair) for pair in adj_set)
             if taxonomy_string:
-                taxonomy_list = taxonomy_string.split("|")
-                new_adj_dict = {taxonomy_list[i]:taxonomy_list[i+1] for i in range(len(taxonomy_list)-1)}
-                for taxon in taxonomy_list:
-                    try:
-                        count_dict[taxon] += 1
-                        encode_dict[taxon]
-                    except KeyError:
-                        encode_dict[taxon] = max(encode_dict.values()) + 1
-                        count_dict[taxon] = 1
-                for parent,child in new_adj_dict.items():
-                    adj_set.add((encode_dict[parent],encode_dict[child]))
-                with open(f'adj_set.json', "w+") as file:
-                    json.dump(list(adj_set), file)
-                with open(f'count_dict.json', "w+") as file:
-                    json.dump(count_dict, file)
-                with open(f'encode_dict.json', "w+") as file:
-                    json.dump(encode_dict, file)
+                if not reduce:
+                    taxonomy_list = taxonomy_string.split("|")
+                    new_adj_dict = {taxonomy_list[i]:taxonomy_list[i+1] for i in range(len(taxonomy_list)-1)}
+                    for taxon in taxonomy_list:
+                        try:
+                            count_dict[taxon] += 1
+                            encode_dict[taxon]
+                        except KeyError:
+                            encode_dict[taxon] = max(encode_dict.values()) + 1
+                            count_dict[taxon] = 1
+                    for parent,child in new_adj_dict.items():
+                        adj_set.add((encode_dict[parent],encode_dict[child]))
+                    with open(f'adj_set.json', "w+") as file:
+                        json.dump(list(adj_set), file)
+                    with open(f'count_dict.json', "w+") as file:
+                        json.dump(count_dict, file)
+                    with open(f'encode_dict.json', "w+") as file:
+                        json.dump(encode_dict, file)
+                else:
+                    taxonomy_list = taxonomy_string.split("|")
+
+                    for taxon in taxonomy_list:
+                        count_dict[taxon] -= 1
+                        if count_dict[taxon] == 0:
+                            del count_dict[taxon]
+                            for pair in adj_set:
+                                if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
+                                    adj_set.remove(pair)
+                            del encode_dict[taxon]
+                    with open(f'adj_set.json', "w+") as file:
+                        json.dump(list(adj_set), file)
+                    with open(f'count_dict.json', "w+") as file:
+                        json.dump(count_dict, file)
+                    with open(f'encode_dict.json', "w+") as file:
+                        json.dump(encode_dict, file)
             return adj_set, count_dict
         except FileNotFoundError:
             tax_db = pd.read_csv(self.taxonomy_file, header=[0])
@@ -477,8 +495,10 @@ if __name__ == "__main__":
 
     if arg_dict['rm_record']:
         exists = my_database.find_id(arg_dict['rm_record'])
+        tax = my_database.find_tax(arg_dict['rm_record'])
         if exists:
             my_database.rm_record(arg_dict['rm_record'])
+            my_database.calculate_content(taxonomy_string=tax, reduce=True)
             my_logger = Logger("rm_record", valid_accession=arg_dict['rm_record'])
             my_logger.log_change()
         else:

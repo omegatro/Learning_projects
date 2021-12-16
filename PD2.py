@@ -151,7 +151,6 @@ class Database:
     def find_tax(self, valid_accession):
         '''Method is used to get taxonomy information of a record in the database.'''
         tax_db = pd.read_csv(self.taxonomy_file, header=[0])
-        print(tax_db.index[tax_db["accession_number"] == valid_accession])
         accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
         return tax_db.iloc[accession_ind].loc['taxonomy_string']
 
@@ -524,8 +523,6 @@ if __name__ == "__main__":
                 sys.exit(f'Sequence with given accession number is not stored in local database: {old_id}')
         else:
             sys.exit(f'Accession format is not valid: {old_id} Expected(regex): {my_interface.accession_pattern}')
-
-
 
     if arg_dict['view_data']:
         count_data = my_database.calculate_content()

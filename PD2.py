@@ -310,7 +310,7 @@ class Plotter:
         graph = Graph()
         graph.add_vertices(nr_vertices)
         graph.add_edges(list(self.adj_set))
-        lay = graph.layout('rt')
+        lay = graph.layout('tree')
         max_y = max([lay[k][1] for k in range(nr_vertices)])
 
         es = EdgeSeq(graph) # sequence of edges
@@ -423,14 +423,18 @@ if __name__ == "__main__":
                     if not dupl_check:
                         request_check = my_qry.check_output(acc_nr)
                         if request_check:
-                            output_seq = my_qry.get_fasta(acc_nr)
-                            sqnc = output_seq[0]
-                            tax_str = "|".join(my_qry.get_taxonomy(acc_nr))
-                            descr = 'added from ncbi'
-                            my_database.add_record(acc_nr,sqnc,tax_str,descr)
-                            my_database.calculate_content(taxonomy_string=tax_str)
-                            my_logger = Logger("add_ncbi",valid_accession=acc_nr)
-                            my_logger.log_change()
+                            try:
+                                output_seq = my_qry.get_fasta(acc_nr)
+                                sqnc = output_seq[0]
+                                tax_str = "|".join(my_qry.get_taxonomy(acc_nr))
+                                descr = 'added from ncbi'
+                                my_database.add_record(acc_nr,sqnc,tax_str,descr)
+                                my_database.calculate_content(taxonomy_string=tax_str)
+                                my_logger = Logger("add_ncbi",valid_accession=acc_nr)
+                                my_logger.log_change()
+                            except ValueError:
+                                print(acc_nr)
+                                continue
                     else:
                         print(f'Local database already contain a sequence with given accession number: {acc_nr}')
                 else:

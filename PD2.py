@@ -24,8 +24,8 @@ class Interface:
             "--exp-meta": f"Create a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--exp-records": f"Create a fasta file containing sequences & a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--rm-record": f"Remove records from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
-            "--ch-header": f"Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database. Expected: valid_accession_from_local_db",
-            "--ch-tax": f"Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database. Expected: valid_accession_from_local_db",
+            "--ch-header": f"Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database. Expected: valid_accession_from_local_db,new_accession",
+            "--ch-tax": f"Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database. Expected: valid_accession_from_local_db,new_taxonomy_string",
             "--view-data": "Visualize the contents of the local database as a tree chart, showing the number of records that belong to each taxonomic group."
         }
 
@@ -151,6 +151,7 @@ class Database:
     def find_tax(self, valid_accession):
         '''Method is used to get taxonomy information of a record in the database.'''
         tax_db = pd.read_csv(self.taxonomy_file, header=[0])
+        print(tax_db.index[tax_db["accession_number"] == valid_accession])
         accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
         return tax_db.iloc[accession_ind].loc['taxonomy_string']
 
@@ -178,6 +179,8 @@ class Database:
         accession_ind = tax_db.index[tax_db["accession_number"] == old_accession].to_list()[0]
         tax_db.at[accession_ind,'accession_number']=new_accession
         seq_db[new_accession] = seq_db[old_accession]
+        seq_db[new_accession].id = new_accession
+        seq_db[new_accession].description = f'{new_accession} replaced manually'
         del seq_db[old_accession]
         seq_db[new_accession].id = new_accession
         with open(self.sequence_file, "w+") as seq_db_file:
@@ -331,7 +334,6 @@ class Plotter:
 
 
 if __name__ == "__main__":
-    
     my_interface = Interface('ACGT', 'csv', r"^[A-z]{2}_[A-Z0-9]*$")
     arg_dict = vars(my_interface.parse_arguments())
 
@@ -417,15 +419,62 @@ if __name__ == "__main__":
                 else:
                     print(f'Accession id format is not valid: {acc_nr} Expected(regex): {my_interface.accession_pattern}')
         else:
-            sys.exit(f'Files with expected type do not exist. Expected:\n {arg_dict["add_ncbi_list"]}.{my_interface.valid_input_type}')
+            sys.exit(f'File with expected type do not exist. Expected:\n {arg_dict["add_ncbi_list"]}.{my_interface.valid_input_type}')
+
     if arg_dict['exp_fasta']:
-        pass
+        file_check = os.path.exists(f'{arg_dict["exp_fasta"]}')
+        if file_check:
+            record_list = list(pd.read_csv(arg_dict['exp_fasta'],header=[0]).iloc[:, 0])
+            out_dict = {}
+            for acc_nr in record_list:
+                exists = my_database.find_id(acc_nr)
+                if exists:
+                    out_dict[acc_nr] = my_database.export_fasta(acc_nr)
+                else:
+                    print(f'Sequence with given accession number is not stored in local database: {acc_nr}')
+            with open(f'exported_sequences.fasta', 'w') as handle:
+                SeqIO.write(out_dict.values(), handle, 'fasta')
+            sys.exit("Exported available sequences to exported_sequences.fasta file")
+        else:
+            sys.exit(f'File with expected type do not exist. Expected:\n {arg_dict["exp_fasta"]}.{my_interface.valid_input_type}')
 
     if arg_dict['exp_meta']:
-        pass
+        file_check = os.path.exists(f'{arg_dict["exp_meta"]}')
+        if file_check:
+            record_list = list(pd.read_csv(arg_dict['exp_meta'],header=[0]).iloc[:, 0])
+            out_df = pd.DataFrame(columns=["accession_number", "taxonomy_string"])
+            for acc_nr in record_list:
+                exists = my_database.find_id(acc_nr)
+                if exists:
+                    record = my_database.export_tax(acc_nr)
+                    out_df = out_df.append(record)
+                else:
+                    print(f'Sequence with given accession number is not stored in local database: {acc_nr}')
+            out_df.to_csv(f'exported_taxonomy.csv',header=True, index=False)
+            sys.exit("Exported available taxonomies to exported_taxonomy.csv file")
+        else:
+            sys.exit(f'File with expected type do not exist. Expected:\n {arg_dict["exp_meta"]}.{my_interface.valid_input_type}')
 
     if arg_dict['exp_records']:
-        pass
+        file_check = os.path.exists(f'{arg_dict["exp_records"]}')
+        if file_check:
+            record_list = list(pd.read_csv(arg_dict['exp_records'],header=[0]).iloc[:, 0])
+            out_df = pd.DataFrame(columns=["accession_number", "taxonomy_string"])
+            out_dict = {}
+            for acc_nr in record_list:
+                exists = my_database.find_id(acc_nr)
+                if exists:
+                    record = my_database.export_tax(acc_nr)
+                    out_df = out_df.append(record)
+                    out_dict[acc_nr] = my_database.export_fasta(acc_nr)
+                else:
+                    print(f'Sequence with given accession number is not stored in local database: {acc_nr}')
+            out_df.to_csv(f'exported_taxonomy.csv',header=True, index=False)
+            with open(f'exported_sequences.fasta', 'w') as handle:
+                SeqIO.write(out_dict.values(), handle, 'fasta')
+            sys.exit("Exported available taxonomies to exported_taxonomy.csv file\nExported available sequences to exported_sequences.fasta file")
+        else:
+            sys.exit(f'File with expected type do not exist. Expected:\n {arg_dict["exp_records"]}.{my_interface.valid_input_type}')
 
     if arg_dict['rm_record']:
         exists = my_database.find_id(arg_dict['rm_record'])
@@ -437,10 +486,46 @@ if __name__ == "__main__":
             sys.exit('Sequence with given accession number is not stored in local database.')
 
     if arg_dict['ch_header']:
-        pass
+        old_id = arg_dict['ch_header'].split(",")[0]
+        new_id = arg_dict['ch_header'].split(",")[1]
+        id_check_old = my_interface.check_format(old_id)
+        id_check_new = my_interface.check_format(new_id)
+        id_exists_new = my_database.find_id(new_id)
+        exists = my_database.find_id(old_id)
+        if id_check_old:
+            if exists:
+                if id_check_new:
+                    if not id_exists_new:
+                        my_database.write_id(old_id, new_id)
+                        my_logger = Logger("ch_header", old_accession=old_id, new_accession=new_id)
+                        my_logger.log_change()
+                    else:
+                        sys.exit(f'New id already exists in the database: {new_id}')
+                else:
+                    sys.exit(f'New id format is not valid: {new_id} Expected(regex): {my_interface.accession_pattern}')
+            else:
+                sys.exit(f'Sequence with given accession number is not stored in local database: {old_id}')
+        else:
+            sys.exit(f'Old id format is not valid: {old_id} Expected(regex): {my_interface.accession_pattern}')
 
     if arg_dict['ch_tax']:
-        pass
+        id = arg_dict['ch_tax'].split(",")[0]
+        new_tax = arg_dict['ch_tax'].split(",")[1]
+        id_check = my_interface.check_format(id)
+        exists = my_database.find_id(id)
+        old_tax = my_database.find_tax(id)
+        
+        if id_check:
+            if exists:
+                my_database.write_tax(id,new_tax)
+                my_logger = Logger("ch_tax", valid_accession=id, old_taxonomy=old_tax, new_taxonomy=new_tax)
+                my_logger.log_change()
+            else:
+                sys.exit(f'Sequence with given accession number is not stored in local database: {old_id}')
+        else:
+            sys.exit(f'Accession format is not valid: {old_id} Expected(regex): {my_interface.accession_pattern}')
+
+
 
     if arg_dict['view_data']:
         count_data = my_database.calculate_content()

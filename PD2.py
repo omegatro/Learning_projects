@@ -128,7 +128,7 @@ class Database:
                             del count_dict[taxon]
                             for pair in adj_set:
                                 if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
-                                    adj_set.remove(pair)
+                                    adj_set.pop(pair)
                             del encode_dict[taxon]
                     with open(f'adj_set.json', "w+") as file:
                         json.dump(list(adj_set), file)
@@ -295,6 +295,7 @@ class Logger:
         pd2_logger.addHandler(log_file_handler)
         pd2_logger.info(self.log_dict[self.operation_type])
         log_file_handler.close() #Close file after logging is complete
+        logging.shutdown()
 
 
 class Plotter:

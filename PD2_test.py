@@ -186,5 +186,4 @@ class TestDatabaseMethods(unittest.TestCase):
         os.remove(my_database.taxonomy_file)
 
 if __name__ == '__main__':
-    unittest.main()
-    
+    unittest.main()   

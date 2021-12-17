@@ -119,9 +119,9 @@ class Database:
                         count_dict[taxon] -= 1
                         if count_dict[taxon] == 0:
                             del count_dict[taxon]
-                            for pair in adj_set:
+                            for pair in list(adj_set):
                                 if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
-                                    adj_set.pop(pair)
+                                    adj_set.remove(pair)
                             del encode_dict[taxon]
                 with open(f'adj_set.json', "w+") as file:
                         json.dump(list(adj_set), file)
@@ -268,33 +268,50 @@ class Query_ncbi:
 
 class Logger:
     #Finished (unit)
-    def __init__(self, operation_type, valid_accession=None,  taxonomy=None,  old_accession=None,  old_taxonomy=None,  new_accession=None,  new_taxonomy=None, log_file='PD2.log'):
+    def __init__(self, operation_type, valid_accession=None,  old_accession=None,  old_taxonomy=None,  new_accession=None,  new_taxonomy=None, log_file='PD2.log'):
         self.operation_type = operation_type
         self.log_file = log_file
+        self._valid_accession = valid_accession
+        self._old_accession = old_accession
+        self._old_taxonomy = old_taxonomy
+        self._new_accession = new_accession
+        self._new_taxonomy = new_taxonomy
         self.log_dict = {
-        "add_fasta":f"New record was added from fasta file (id: {valid_accession})",
-        "add_ncbi":f"New record was added from ncbi database (id: {valid_accession})",
-        "rm_record":f"Record was removed (id: {valid_accession})",
-        "ch_header":f"ID of the record was changed from {old_accession} to {new_accession}",
-        "ch_tax":f"Taxonomy information for {valid_accession} was changed from {old_taxonomy} to {new_taxonomy}"
+        "add_fasta":f"New record was added from fasta file (id: {self._valid_accession})",
+        "add_ncbi":f"New record was added from ncbi database (id: {self._valid_accession})",
+        "rm_record":f"Record was removed (id: {self._valid_accession})",
+        "ch_header":f"ID of the record was changed from {self._old_accession} to {self._new_accession}",
+        "ch_tax":f"Taxonomy information for {self._valid_accession} was changed from {self._old_taxonomy} to {self._new_taxonomy}"
     }
 
-    def log_change(self):
-        '''Method is used to log local changes to database files'''
+    def update_log_dict(self):
+        self.log_dict = {"add_fasta":f"New record was added from fasta file (id: {self._valid_accession})",
+        "add_ncbi":f"New record was added from ncbi database (id: {self._valid_accession})",
+        "rm_record":f"Record was removed (id: {self._valid_accession})",
+        "ch_header":f"ID of the record was changed from {self._old_accession} to {self._new_accession}",
+        "ch_tax":f"Taxonomy information for {self._valid_accession} was changed from {self._old_taxonomy} to {self._new_taxonomy}"}
+
+    def create_logger(self):
+        '''Method is used to create and configure logger''' 
         #Create log file if it does not exist
         log_file = Path(self.log_file)
         log_file.touch(exist_ok=True)
         
         #Log changes - full documentation link - https://docs.python.org/3/howto/logging.html
-        pd2_logger = logging.getLogger(self.operation_type)
-        pd2_logger.setLevel(logging.DEBUG)
-        log_file_handler = logging.FileHandler(filename=self.log_file)
-        log_file_formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %I:%M:%S')
-        log_file_handler.setFormatter(log_file_formatter)
-        pd2_logger.addHandler(log_file_handler)
-        pd2_logger.info(self.log_dict[self.operation_type])
-        log_file_handler.close() #Close file after logging is complete
-        logging.shutdown()
+        self.pd2_logger = logging.getLogger(self.operation_type)
+        self.pd2_logger.setLevel(logging.DEBUG)
+        self.log_file_handler = logging.FileHandler(filename=self.log_file)
+        self.log_file_formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %I:%M:%S')
+        self.log_file_handler.setFormatter(self.log_file_formatter)
+        self.pd2_logger.addHandler(self.log_file_handler)
+
+    def log_change(self):
+        '''Method is used to log local changes to database files'''
+        self.pd2_logger.info(self.log_dict[self.operation_type])
+
+    def close_logger(self):
+        '''Method is used to close file handler after logging is done'''
+        self.log_file_handler.close() #Close file after logging is complete
 
 
 class Plotter:
@@ -353,7 +370,8 @@ class Plotter:
 if __name__ == "__main__":
     my_interface = Interface('ACGT', 'csv', r"^[A-z]{2}_[A-Z0-9]*$")
     arg_dict = vars(my_interface.parse_arguments())
-
+    my_logger = Logger(None, valid_accession="")
+    my_logger.create_logger()
     if any([True if arg else False for arg in arg_dict.values()]):
         my_database = Database('my_database')
         my_database.create_db_files()
@@ -376,7 +394,9 @@ if __name__ == "__main__":
                 if all([ab_check,id_check]) and not dupl_check:
                     my_database.add_record(acc_nr,sqnc,tax_str,descr)
                     my_database.calculate_content(taxonomy_string=tax_str)
-                    my_logger = Logger("add_fasta",acc_nr)
+                    my_logger.operation_type = "add_fasta"
+                    my_logger._valid_accession = acc_nr
+                    my_logger.update_log_dict()
                     my_logger.log_change()
                 else:
                     if (not ab_check) and (not id_check):
@@ -405,7 +425,9 @@ if __name__ == "__main__":
                     descr = 'added from ncbi'
                     my_database.add_record(acc_nr,sqnc,tax_str,descr)
                     my_database.calculate_content(taxonomy_string=tax_str)
-                    my_logger = Logger("add_ncbi",valid_accession=arg_dict['add_ncbi'])
+                    my_logger.operation_type = "add_ncbi"
+                    my_logger._valid_accession = acc_nr
+                    my_logger.update_log_dict()
                     my_logger.log_change()
             else:
                 sys.exit(f'Local database already contain a sequence with given accession number.')
@@ -430,10 +452,13 @@ if __name__ == "__main__":
                                 descr = 'added from ncbi'
                                 my_database.add_record(acc_nr,sqnc,tax_str,descr)
                                 my_database.calculate_content(taxonomy_string=tax_str)
-                                my_logger = Logger("add_ncbi",valid_accession=acc_nr)
+                                # my_logger = Logger("add_ncbi",valid_accession=acc_nr)
+                                my_logger.operation_type = "add_ncbi"
+                                my_logger._valid_accession = acc_nr
+                                my_logger.update_log_dict()
                                 my_logger.log_change()
                             except ValueError:
-                                print(acc_nr)
+                                print(f"{acc_nr} corresponds to sequencing project - no reference sequence attached.")
                                 continue
                     else:
                         print(f'Local database already contain a sequence with given accession number: {acc_nr}')
@@ -499,11 +524,13 @@ if __name__ == "__main__":
 
     if arg_dict['rm_record']:
         exists = my_database.find_id(arg_dict['rm_record'])
-        tax = my_database.find_tax(arg_dict['rm_record'])
         if exists:
+            tax = my_database.find_tax(arg_dict['rm_record'])
             my_database.rm_record(arg_dict['rm_record'])
             my_database.calculate_content(taxonomy_string=tax, reduce=True)
-            my_logger = Logger("rm_record", valid_accession=arg_dict['rm_record'])
+            my_logger.operation_type = "rm_record"
+            my_logger._valid_accession = arg_dict['rm_record']
+            my_logger.update_log_dict()
             my_logger.log_change()
         else:
             sys.exit('Sequence with given accession number is not stored in local database.')
@@ -520,7 +547,11 @@ if __name__ == "__main__":
                 if id_check_new:
                     if not id_exists_new:
                         my_database.write_id(old_id, new_id)
-                        my_logger = Logger("ch_header", old_accession=old_id, new_accession=new_id)
+                        my_logger.operation_type = "ch_header"
+                        my_logger._valid_accession = old_id
+                        my_logger._old_accession = old_id
+                        my_logger._new_accession = new_id
+                        my_logger.update_log_dict()
                         my_logger.log_change()
                     else:
                         sys.exit(f'New id already exists in the database: {new_id}')
@@ -543,7 +574,11 @@ if __name__ == "__main__":
                 my_database.write_tax(id,new_tax)
                 my_database.calculate_content(old_tax, reduce=True)
                 my_database.calculate_content(taxonomy_string=new_tax)
-                my_logger = Logger("ch_tax", valid_accession=id, old_taxonomy=old_tax, new_taxonomy=new_tax)
+                my_logger.operation_type = "ch_tax"
+                my_logger._valid_accession = id
+                my_logger._old_taxonomy = old_tax
+                my_logger._new_taxonomy = new_tax
+                my_logger.update_log_dict()
                 my_logger.log_change()
             else:
                 sys.exit(f'Sequence with given accession number is not stored in local database: {old_id}')

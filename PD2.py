@@ -113,15 +113,8 @@ class Database:
                             count_dict[taxon] = 1
                     for parent,child in new_adj_dict.items():
                         adj_set.add((encode_dict[parent],encode_dict[child]))
-                    with open(f'adj_set.json', "w+") as file:
-                        json.dump(list(adj_set), file)
-                    with open(f'count_dict.json', "w+") as file:
-                        json.dump(count_dict, file)
-                    with open(f'encode_dict.json', "w+") as file:
-                        json.dump(encode_dict, file)
                 else:
                     taxonomy_list = taxonomy_string.split("|")
-
                     for taxon in taxonomy_list:
                         count_dict[taxon] -= 1
                         if count_dict[taxon] == 0:
@@ -130,12 +123,12 @@ class Database:
                                 if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
                                     adj_set.pop(pair)
                             del encode_dict[taxon]
-                    with open(f'adj_set.json', "w+") as file:
+                with open(f'adj_set.json', "w+") as file:
                         json.dump(list(adj_set), file)
-                    with open(f'count_dict.json', "w+") as file:
-                        json.dump(count_dict, file)
-                    with open(f'encode_dict.json', "w+") as file:
-                        json.dump(encode_dict, file)
+                with open(f'count_dict.json', "w+") as file:
+                    json.dump(count_dict, file)
+                with open(f'encode_dict.json', "w+") as file:
+                    json.dump(encode_dict, file)
             return adj_set, count_dict
         except FileNotFoundError:
             tax_db = pd.read_csv(self.taxonomy_file, header=[0])
@@ -184,9 +177,15 @@ class Database:
 
     def write_tax(self, valid_accession, new_taxonomy):
         '''Method is used to replace a taxonomy information of a record in the database.'''
-        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
-        accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
-        tax_db.at[accession_ind,'taxonomy_string']=new_taxonomy
+        if "|" in new_taxonomy:
+            tax_db = pd.read_csv(self.taxonomy_file, header=[0])
+            accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
+            old_tax = tax_db.iloc[accession_ind]
+            tax_db.at[accession_ind,'taxonomy_string']=new_taxonomy
+
+        else:
+            sys.exit('Invalid taxonomy string. Expected: A|B|...|C with A,B,C as taxons (length irrelevant)')
+        
         tax_db.to_csv(self.taxonomy_file, index=False)
 
     def write_id(self, old_accession, new_accession):
@@ -542,6 +541,8 @@ if __name__ == "__main__":
         if id_check:
             if exists:
                 my_database.write_tax(id,new_tax)
+                my_database.calculate_content(old_tax, reduce=True)
+                my_database.calculate_content(taxonomy_string=new_tax)
                 my_logger = Logger("ch_tax", valid_accession=id, old_taxonomy=old_tax, new_taxonomy=new_tax)
                 my_logger.log_change()
             else:

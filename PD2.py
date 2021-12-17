@@ -6,7 +6,7 @@ from igraph import Graph, EdgeSeq
 
 
 class Interface:
-    #Finished (unit)
+    '''Class is set to represent command line interface to interact with local database'''
     def __init__(self, alphabet, valid_input_type, accession_pattern):
         self.alphabet = alphabet
         self.valid_input_type = valid_input_type
@@ -65,7 +65,7 @@ class Interface:
 
 
 class Database:
-    #Finished (unit)
+    '''Class is set to represent local database of sequences in fasta format along with annotation csv table'''
     def __init__(self, db_name):
         self.sequence_file = Path(f'{db_name}.fasta')
         self.taxonomy_file = Path(f'{db_name}.csv')
@@ -90,8 +90,38 @@ class Database:
         tax_db = tax_db.append(new_record_tax)
         tax_db.to_csv(self.taxonomy_file, index=False)
         
-    def calculate_content(self, taxonomy_string=None, reduce=False):
+    def calculate_content(self, taxonomy_string=None, reduce=False, accession=None, recalc_accessions=False):
         '''Method is used to calculate current database content by taxonomic group and store in a file.'''
+        if recalc_accessions:
+            with open(f'adj_set.json', "r+") as f1:
+                adj_set = json.load(f1)
+            with open(f'count_dict.json', "r+") as f2:
+                count_dict = json.load(f2)
+            with open(f'encode_dict.json', "r+") as f3:
+                encode_dict = json.load(f3)
+            with open(f'accession_map.json', 'r+') as f4:
+                acc_dict = json.load(f4)
+  
+            tax_db = pd.read_csv(self.taxonomy_file, header=[0])
+            split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
+            new_split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
+            new_split_product['accession_number'] = tax_db['accession_number']
+
+            acc_dict = {}
+            for taxon in encode_dict.keys():
+                new_accession = list(new_split_product[new_split_product.isin([taxon]).any(axis=1)]['accession_number'])
+                if taxon not in acc_dict.keys():
+                    acc_dict[taxon] = new_accession
+                else:
+                    acc_dict[taxon] = list(set(acc_dict[taxon] + new_accession))
+            
+            new_acc_dict = {}
+            for taxon in acc_dict.keys():
+                new_acc_dict[encode_dict[taxon]] = acc_dict[taxon]
+            
+            with open(f'accession_map.json', "w+") as file:
+                json.dump(new_acc_dict, file)
+            return new_acc_dict
         try:
             with open(f'adj_set.json', "r+") as f1:
                 adj_set = json.load(f1)
@@ -99,6 +129,8 @@ class Database:
                 count_dict = json.load(f2)
             with open(f'encode_dict.json', "r+") as f3:
                 encode_dict = json.load(f3)
+            with open(f'accession_map.json', 'r+') as f4:
+                acc_dict = json.load(f4)
             adj_set = set(tuple(pair) for pair in adj_set)
             if taxonomy_string:
                 if not reduce:
@@ -113,31 +145,63 @@ class Database:
                             count_dict[taxon] = 1
                     for parent,child in new_adj_dict.items():
                         adj_set.add((encode_dict[parent],encode_dict[child]))
+                    
+                    tax_db = pd.read_csv(self.taxonomy_file, header=[0])
+                    new_split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
+                    new_split_product['accession_number'] = tax_db['accession_number']
+
+                    for taxon in taxonomy_list:
+                        new_accession = list(new_split_product[new_split_product.isin([taxon]).any(axis=1)]['accession_number'])
+                        if taxon not in acc_dict.keys():
+                            acc_dict[encode_dict[taxon]] = new_accession
+                        else:
+                            acc_dict[encode_dict[taxon]] = list(set(acc_dict[taxon] + new_accession))
+
                 else:
                     taxonomy_list = taxonomy_string.split("|")
                     for taxon in taxonomy_list:
                         count_dict[taxon] -= 1
                         if count_dict[taxon] == 0:
+                            acc_dict[str(encode_dict[taxon])].remove(accession)
                             del count_dict[taxon]
                             for pair in list(adj_set):
                                 if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
                                     adj_set.remove(pair)
                             del encode_dict[taxon]
+                        
                 with open(f'adj_set.json', "w+") as file:
                         json.dump(list(adj_set), file)
                 with open(f'count_dict.json', "w+") as file:
                     json.dump(count_dict, file)
                 with open(f'encode_dict.json', "w+") as file:
                     json.dump(encode_dict, file)
-            return adj_set, count_dict
+                with open(f'accession_map.json', "w+") as file:
+                    json.dump(acc_dict, file)
+            return adj_set, count_dict, acc_dict, encode_dict
         except FileNotFoundError:
             tax_db = pd.read_csv(self.taxonomy_file, header=[0])
             split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
+            new_split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
+            new_split_product['accession_number'] = tax_db['accession_number']
             adj_set = set()
             count_dict = {}
             for col in split_product.columns:
                 count_dict.update(dict(split_product[col].value_counts()))
+            
             encode_dict = {node:i for i,node in enumerate(count_dict.keys())}
+            
+            acc_dict = {}
+            for taxon in encode_dict.keys():
+                new_accession = list(new_split_product[new_split_product.isin([taxon]).any(axis=1)]['accession_number'])
+                if taxon not in acc_dict.keys():
+                    acc_dict[taxon] = new_accession
+                else:
+                    acc_dict[taxon] = list(set(acc_dict[taxon] + new_accession))
+            
+            new_acc_dict = {}
+            for taxon in acc_dict.keys():
+                new_acc_dict[encode_dict[taxon]] = acc_dict[taxon]
+
             count_dict = {key:int(value) for key,value in count_dict.items()}
             split_product = split_product.drop_duplicates()
             for i in range(len(split_product.columns)):
@@ -150,9 +214,10 @@ class Database:
                 json.dump(count_dict, file)
             with open(f'encode_dict.json', "w+") as file:
                 json.dump(encode_dict, file)
-            return adj_set, count_dict
+            with open(f'accession_map.json', 'w+') as file:
+                json.dump(new_acc_dict, file)
+            return adj_set, count_dict, acc_dict, encode_dict
         
-
     def find_id(self, valid_accession):
         '''Method is used to check if given id exists in the database.'''
         tax_db = pd.read_csv(self.taxonomy_file, header=[0])
@@ -227,7 +292,7 @@ class Database:
 
 
 class Query_ncbi:
-    #Finished (unit)
+    '''Class is set to contain methods to send requests to ncbi nucleotide database.'''
     def __init__(self, database, email, alphabet):
         self.database = database
         self.email = email
@@ -267,7 +332,7 @@ class Query_ncbi:
 
 
 class Logger:
-    #Finished (unit)
+    '''Class is set to provide logging options to store history of edits done to the local database via command line'''
     def __init__(self, operation_type, valid_accession=None,  old_accession=None,  old_taxonomy=None,  new_accession=None,  new_taxonomy=None, log_file='PD2.log'):
         self.operation_type = operation_type
         self.log_file = log_file
@@ -315,15 +380,19 @@ class Logger:
 
 
 class Plotter:
-    #Finished (unit)
-    def __init__(self, adj_set, count_dict):
+    '''Class is set to provide visual view options for the content of the local database'''
+    def __init__(self, adj_set, count_dict, accession_map, encode_dict):
         self.adj_set = adj_set
         self.count_dict = count_dict
+        self.accession_map = accession_map
+        self.encode_dict = encode_dict
 
     def display(self):
         '''Method is used to display current content of the local database'''
         nr_vertices = len(self.count_dict.keys())
-        v_label = [f'{key}: {self.count_dict[key]}' for key in self.count_dict.keys()]
+        nl = '<br>'
+        v_label = [f'{key}: {self.count_dict[key]}{nl}{nl.join(self.accession_map[str(self.encode_dict[key])])}' for key in self.count_dict.keys()]
+        ball_names = [f'{key}: {self.count_dict[key]}' for key in self.count_dict.keys()]
         graph = Graph()
         graph.add_vertices(nr_vertices)
         graph.add_edges(list(self.adj_set))
@@ -345,7 +414,7 @@ class Plotter:
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=Xe, y=Ye, mode='lines', line=dict(color='rgb(210,210,210)', width=1), hoverinfo='none'))
         fig.add_trace(go.Scatter(x=Xn, y=Yn, mode='markers', name='bla', marker=dict(symbol='circle-dot', size=100, color='#6175c1',    #'#DB4551',
-                                        line=dict(color='rgb(50,50,50)', width=1)), text=labels, hoverinfo='text', opacity=0.8))
+                                        line=dict(color='rgb(50,50,50)', width=1)), text=v_label, hoverinfo='text', opacity=0.8))
 
 
         def make_annotations(pos, text, font_size=15, font_color='rgb(0,0,0)'):
@@ -356,7 +425,7 @@ class Plotter:
             for k in range(L):
                 annotations.append(
                     # or replace labels with a different list for the text within the circle
-                    dict(text=labels[k], x=pos[k][0], y=2*max_y-lay[k][1], xref='x1', yref='y1', font=dict(color=font_color, size=font_size), showarrow=False)
+                    dict(text=ball_names[k], x=pos[k][0], y=2*max_y-lay[k][1], xref='x1', yref='y1', font=dict(color=font_color, size=font_size), showarrow=False)
                 )
             return annotations
 
@@ -527,7 +596,7 @@ if __name__ == "__main__":
         if exists:
             tax = my_database.find_tax(arg_dict['rm_record'])
             my_database.rm_record(arg_dict['rm_record'])
-            my_database.calculate_content(taxonomy_string=tax, reduce=True)
+            my_database.calculate_content(taxonomy_string=tax, reduce=True, accession=arg_dict['rm_record'])
             my_logger.operation_type = "rm_record"
             my_logger._valid_accession = arg_dict['rm_record']
             my_logger.update_log_dict()
@@ -551,6 +620,7 @@ if __name__ == "__main__":
                         my_logger._valid_accession = old_id
                         my_logger._old_accession = old_id
                         my_logger._new_accession = new_id
+                        my_database.calculate_content(recalc_accessions=True)
                         my_logger.update_log_dict()
                         my_logger.log_change()
                     else:
@@ -572,7 +642,7 @@ if __name__ == "__main__":
         if id_check:
             if exists:
                 my_database.write_tax(id,new_tax)
-                my_database.calculate_content(old_tax, reduce=True)
+                my_database.calculate_content(old_tax, accession=id, reduce=True)
                 my_database.calculate_content(taxonomy_string=new_tax)
                 my_logger.operation_type = "ch_tax"
                 my_logger._valid_accession = id
@@ -587,5 +657,5 @@ if __name__ == "__main__":
 
     if arg_dict['view_data']:
         count_data = my_database.calculate_content()
-        my_plotter = Plotter(count_data[0],count_data[1])
+        my_plotter = Plotter(count_data[0],count_data[1],count_data[2],count_data[3])
         my_plotter.display()

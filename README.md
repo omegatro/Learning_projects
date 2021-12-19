@@ -1,6 +1,7 @@
 # Reference sequence database management tool
 - A script is designed to create and manage a local database of reference sequences in fasta format, along with annotation table of taxonomic data for each sequence and visualization tool.
 - The script will generate 1 fasta file to store genome sequences (can get large), 1 csv file to store taxonomic information for each sequence and 4 json files, storing information required to visualize the current content of the database.
+- The files will be created in the same directory where the script is stored.
 ## Options
 - add-fasta: Add new record(s) from locally stored fasta file & metadata file of csv format Expected: file_name (same file name for csv & fasta)
 - add-ncbi: Add new record from NCBI RefSeq database by correct accession number Expected: valid_accession_number

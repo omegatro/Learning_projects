@@ -373,6 +373,7 @@ class Plotter:
 
     def display(self):
         '''Method is used to display current content of the local database'''
+        #Adapted from https://plotly.com/python/tree-plots/
         nr_vertices = len(self.count_dict.keys())
         nl = '<br>'
         v_label = [f'{key}: {self.count_dict[key]}{nl}{nl.join(self.accession_map[str(self.encode_dict[key])])}' for key in self.count_dict.keys()]

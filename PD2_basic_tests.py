@@ -52,7 +52,9 @@ class TestLoggerMethods(unittest.TestCase):
         op_types = ['add_fasta',"add_ncbi","rm_record","ch_header","ch_tax"]
         for op_type in op_types:    
             my_logger = Logger(op_type, log_file="PD2_test.log", valid_accession="NC_157326", old_accession="NL_1456", new_accession="NL_14561", old_taxonomy="old", new_taxonomy="new")
+            my_logger.create_logger()
             my_logger.log_change()
+            my_logger.close_logger()
             with open(f"PD2_test.log", "r+") as log_file:
                 self.assertEqual(log_file.readlines()[-1].strip(), f"{datetime.now().strftime('%Y-%m-%d %I:%M:%S')} {my_logger.log_dict[op_type]}")
             os.remove("PD2_test.log")
@@ -139,8 +141,8 @@ class TestDatabaseMethods(unittest.TestCase):
     def test_Database_write_tax(self):
         my_database.create_db_files()
         my_database.add_record("test_header", "ACGT", "test_taxonomy_string","test_description")
-        my_database.write_tax("test_header", "replaced_test_taxonomy_string")
-        test_tax_record = ["test_header","replaced_test_taxonomy_string"]
+        my_database.write_tax("test_header", "Bacteria|Actinobacteria|Propionibacteriales|Propionibacteriaceae|Cutibacterium")
+        test_tax_record = ["test_header","Bacteria|Actinobacteria|Propionibacteriales|Propionibacteriaceae|Cutibacterium"]
         tax_db = pd.read_csv(my_database.taxonomy_file, header=[0])
         self.assertEqual(tax_db["accession_number"][0], test_tax_record[0])
         self.assertEqual(tax_db["taxonomy_string"][0], test_tax_record[1])

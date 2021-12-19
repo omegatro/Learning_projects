@@ -33,9 +33,9 @@ class Interface:
             if arg != "--view-data":
                 req_arg_grp.add_argument(arg, metavar='\b', help = arg_dict[arg],required=False)  
             else:
-                req_arg_grp.add_argument(arg, help = arg_dict[arg], action='store_true', required=False)
+                req_arg_grp.add_argument(arg, help = arg_dict[arg], action='store_true', required=False) #To allow flag instead of cmd argument
 
-        if len(sys.argv)==1:
+        if len(sys.argv)==1: #If no arguments were provided - print help & exit
             parser.print_help(sys.stderr)
             sys.exit(1)
         self.args = parser.parse_args()
@@ -451,6 +451,7 @@ if __name__ == "__main__":
                     my_logger._valid_accession = acc_nr
                     my_logger.update_log_dict()
                     my_logger.log_change()
+                    my_logger.close_logger()
                 else:
                     if (not ab_check) and (not id_check):
                         sys.exit(f'Expected alphabet & Expected id pattern(regex): {my_interface.accession_pattern}|{my_interface.alphabet}')
@@ -482,6 +483,7 @@ if __name__ == "__main__":
                     my_logger._valid_accession = acc_nr
                     my_logger.update_log_dict()
                     my_logger.log_change()
+                    my_logger.close_logger()
             else:
                 sys.exit(f'Local database already contain a sequence with given accession number.')
         else:
@@ -517,6 +519,7 @@ if __name__ == "__main__":
                         print(f'Local database already contain a sequence with given accession number: {acc_nr}')
                 else:
                     print(f'Accession id format is not valid: {acc_nr} Expected(regex): {my_interface.accession_pattern}')
+            my_logger.close_logger()
         else:
             sys.exit(f'File with expected type do not exist. Expected:\n {arg_dict["add_ncbi_list"]}.{my_interface.valid_input_type}')
 
@@ -585,6 +588,7 @@ if __name__ == "__main__":
             my_logger._valid_accession = arg_dict['rm_record']
             my_logger.update_log_dict()
             my_logger.log_change()
+            my_logger.close_logger()
         else:
             sys.exit('Sequence with given accession number is not stored in local database.')
 
@@ -608,6 +612,7 @@ if __name__ == "__main__":
                         my_database.calculate_content(recalc_accessions=True, accession=old_id, new_accession=new_id, taxonomy_string=tax)
                         my_logger.update_log_dict()
                         my_logger.log_change()
+                        my_logger.close_logger()
                     else:
                         sys.exit(f'New id already exists in the database: {new_id}')
                 else:
@@ -634,6 +639,7 @@ if __name__ == "__main__":
                 my_logger._new_taxonomy = new_tax
                 my_logger.update_log_dict()
                 my_logger.log_change()
+                my_logger.close_logger()
             else:
                 sys.exit(f'Sequence with given accession number is not stored in local database: {id}')
         else:

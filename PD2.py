@@ -245,7 +245,7 @@ class Database:
         if "|" in new_taxonomy:
             tax_db = pd.read_csv(self.taxonomy_file, header=[0])
             accession_ind = tax_db.index[tax_db["accession_number"] == valid_accession].to_list()[0]
-            old_tax = tax_db.iloc[accession_ind]
+
             tax_db.at[accession_ind,'taxonomy_string']=new_taxonomy
 
         else:
@@ -637,10 +637,9 @@ if __name__ == "__main__":
         new_tax = arg_dict['ch_tax'].split(",")[1]
         id_check = my_interface.check_format(id)
         exists = my_database.find_id(id)
-        old_tax = my_database.find_tax(id)
-        
         if id_check:
             if exists:
+                old_tax = my_database.find_tax(id)
                 my_database.write_tax(id,new_tax)
                 my_database.calculate_content(old_tax, accession=id, reduce=True)[2]
                 my_database.calculate_content(taxonomy_string=new_tax)[2]
@@ -651,11 +650,14 @@ if __name__ == "__main__":
                 my_logger.update_log_dict()
                 my_logger.log_change()
             else:
-                sys.exit(f'Sequence with given accession number is not stored in local database: {old_id}')
+                sys.exit(f'Sequence with given accession number is not stored in local database: {id}')
         else:
-            sys.exit(f'Accession format is not valid: {old_id} Expected(regex): {my_interface.accession_pattern}')
+            sys.exit(f'Accession format is not valid: {id} Expected(regex): {my_interface.accession_pattern}')
 
     if arg_dict['view_data']:
-        count_data = my_database.calculate_content()
-        my_plotter = Plotter(count_data[0],count_data[1],count_data[2],count_data[3])
-        my_plotter.display()
+        if len(pd.read_csv(my_database.taxonomy_file,header=[0])['accession_number']) > 0:
+            count_data = my_database.calculate_content()
+            my_plotter = Plotter(count_data[0],count_data[1],count_data[2],count_data[3])
+            my_plotter.display()
+        else:
+            sys.exit(f'Local database does not exist yet or is empty.')

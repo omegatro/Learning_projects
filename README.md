@@ -10,6 +10,7 @@
     - 4 json files, storing information required to visualize the current content of the database
     - PD2.log file to save information about any changes to the database files (fasta & csv)
 - The files will be created in the same directory where the script is stored.
+- Change the email in line 432 of the script to valid email if using with ncbi options.
 ## Special Python packages (tested on Python 3.7.7)
 ```
 pip install biopython plotly igraph pandas

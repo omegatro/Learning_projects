@@ -13,4 +13,4 @@
 - ch-tax: Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database Expected: valid_accession_from_local_dbnew_taxonomy_string
 - view-data: Visualize the contents of the local database as a tree chart, showing the number of records that belong to each taxonomic group
 ## Visualization example
-![The image will be here shortly](https://github.com/omegatr/UNPG/blob/test/viz_example.png?raw=true)
+![The image will be here shortly](https://github.com/omegatro/UNPG/datz5032_final/newplot.jpg?raw=true)

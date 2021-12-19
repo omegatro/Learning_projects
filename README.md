@@ -15,8 +15,55 @@ pip install biopython plotly igraph pandas
 - --exp-meta: Create a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of csv format Expected: path_to_csv
 - --exp-records: Create a fasta file containing sequences & a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of csv format Expected: path_to_csv
 - --rm-record: Remove records from local database based on a list of correct accession numbers provided as a file of csv format Expected: path_to_csv
-- --ch-header: Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database Expected: valid_accession_from_local_dbnew_accession
+- --ch-header: Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database Expected: valid_accession_from_local_db,new_accession
 - --ch-tax: Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database Expected: valid_accession_from_local_dbnew_taxonomy_string
 - --view-data: Visualize the contents of the local database as a tree chart, showing the number of records that belong to each taxonomic group
 ## Visualization example
 ![The image will be here shortly](https://github.com/omegatro/UNPG/blob/datz5032_final/newplot.jpg?raw=true)
+
+## Examples
+- Before you start, move all files you intend to work with to the directory where PD2.py script is locates, e.g.
+```
+cp test_files/* ./
+```
+- Creating a test database from by downloading sequences 
+from https://www.ncbi.nlm.nih.gov/refseq/ and viewing the result
+```
+python PD2.py --add-ncbi-list ncbi_headers.csv
+python PD2.py --view-data
+```
+- Adding sequence from local file
+```
+python PD2.py --add-fasta sequence
+python PD2.py --view-data
+```
+- Adding sequence from ncbi by [accession number](https://www.ncbi.nlm.nih.gov/genbank/samplerecord/#:~:text=An%20accession%20number%20applies%20to,the%20type%20of%20sequence%20record.)
+```
+python PD2.py --add-ncbi NZ_CP033718
+python PD2.py --view-data
+```
+- Changing accession number for a record
+```
+python PD2.py --ch-header NZ_CP033718,NZ_CP033719
+python PD2.py --view-data
+```
+- Changing taxonomy information for a record
+```
+python PD2.py --ch-tax NZ_CP033719,Bacteria|Actinobacteria|Corynebacteriales|Mycobacteriaceae|Mycobacteroides|Mycobacteroides abscessus
+python PD2.py --view-data
+```
+- Removing a record from the database
+```
+python PD2.py --rm-record NZ_CP033719
+python PD2.py --view-data
+```
+- Exporting: sequences, taxonomy information or both (output files will be generated in the folder where PD2.py is located)
+```
+python PD2.py --exp-fasta sequence.csv
+python PD2.py --exp-meta sequence.csv
+python PD2.py --exp-records sequence.csv
+```
+- Big test - 110 sequences will be downloaded from ncbi database - around 275Mb - may take some time (around 20 min), depending on the connection speed.
+```
+python PD2.py --add-ncbi-l big_test.csv
+```

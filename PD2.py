@@ -429,7 +429,7 @@ if __name__ == "__main__":
     if any([True if arg else False for arg in arg_dict.values()]):
         my_database = Database('my_database')
         my_database.create_db_files()
-        my_qry = Query_ncbi('nucleotide', 'jb17048@edu.lu.lv', 'ACGT')
+        my_qry = Query_ncbi('nucleotide', 'email@example.com', 'ACGT')
 
     if arg_dict['add_fasta']:
         file_check = my_interface.check_file_type(f'{arg_dict["add_fasta"]}')

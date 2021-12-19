@@ -67,61 +67,45 @@ class Interface:
 class Database:
     '''Class is set to represent local database of sequences in fasta format along with annotation csv table'''
     def __init__(self, db_name):
+        '''Constructor for the database class'''
         self.sequence_file = Path(f'{db_name}.fasta')
         self.taxonomy_file = Path(f'{db_name}.csv')
         
     def create_db_files(self):
         '''Method is used to create database file in the directory where the script is.'''
         try:
-            self.sequence_file.touch(exist_ok=False)
+            self.sequence_file.touch(exist_ok=False) #Create db file if it does not yet exist, else raise an exception
             self.taxonomy_file.touch(exist_ok=False)
-            tax_file_columns = pd.DataFrame(columns=["accession_number","taxonomy_string"])
-            tax_file_columns.to_csv(self.taxonomy_file, index=False, header=True)
+            tax_file_columns = pd.DataFrame(columns=["accession_number","taxonomy_string"]) #Initialize empty dataframe
+            tax_file_columns.to_csv(self.taxonomy_file, index=False, header=True) #Store initialized dataframe in a file (keep headers)
         except:
-            print(f'Current database files: {self.sequence_file}; {self.taxonomy_file}')
+            print(f'Current database files: {self.sequence_file}; {self.taxonomy_file}') #This message is printed if database files already exist
 
     def add_record(self, header, sequence, taxonomy, description):
         '''Method is used to add new record to database files (taxonomy file & fasta file).'''
-        new_record_seq = SeqIO.SeqRecord(Seq(sequence),id=header, description=description)
-        new_record_tax = pd.DataFrame.from_dict({"accession_number":[header],"taxonomy_string":[taxonomy]})
-        with open(self.sequence_file, "a+") as seq_db:
-            SeqIO.write(new_record_seq, seq_db, "fasta")
-        tax_db = pd.read_csv(self.taxonomy_file, header=[0])
-        tax_db = tax_db.append(new_record_tax)
-        tax_db.to_csv(self.taxonomy_file, index=False)
+        new_record_seq = SeqIO.SeqRecord(Seq(sequence),id=header, description=description) #Initialize new SeqRecord class object to store sequence information untill it is added to the file 
+        new_record_tax = pd.DataFrame.from_dict({"accession_number":[header],"taxonomy_string":[taxonomy]}) #Initialize a dataframe and add accession number and taxonomic of the added sequence to it
+        with open(self.sequence_file, "a+") as seq_db: #Open database file for sequences
+            SeqIO.write(new_record_seq, seq_db, "fasta") #Add new sequence record to the file & update the sequence file content
+        tax_db = pd.read_csv(self.taxonomy_file, header=[0]) #Open database file for taxonomy
+        tax_db = tax_db.append(new_record_tax) #Add new taxonomy record to the file
+        tax_db.to_csv(self.taxonomy_file, index=False) #Update the taxonomy file content
         
-    def calculate_content(self, taxonomy_string=None, reduce=False, accession=None, recalc_accessions=False):
+    def calculate_content(self, taxonomy_string=None, reduce=False, new_accession=None, accession=None, recalc_accessions=False):
         '''Method is used to calculate current database content by taxonomic group and store in a file.'''
         if recalc_accessions:
-            with open(f'adj_set.json', "r+") as f1:
-                adj_set = json.load(f1)
-            with open(f'count_dict.json', "r+") as f2:
-                count_dict = json.load(f2)
-            with open(f'encode_dict.json', "r+") as f3:
-                encode_dict = json.load(f3)
             with open(f'accession_map.json', 'r+') as f4:
                 acc_dict = json.load(f4)
-  
-            tax_db = pd.read_csv(self.taxonomy_file, header=[0])
-            split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
-            new_split_product = tax_db['taxonomy_string'].str.split("|",expand=True)
-            new_split_product['accession_number'] = tax_db['accession_number']
-
-            acc_dict = {}
-            for taxon in encode_dict.keys():
-                new_accession = list(new_split_product[new_split_product.isin([taxon]).any(axis=1)]['accession_number'])
-                if taxon not in acc_dict.keys():
-                    acc_dict[taxon] = new_accession
-                else:
-                    acc_dict[taxon] = list(set(acc_dict[taxon] + new_accession))
-            
-            new_acc_dict = {}
-            for taxon in acc_dict.keys():
-                new_acc_dict[encode_dict[taxon]] = acc_dict[taxon]
-            
+            with open(f'encode_dict.json', "r+") as f3:
+                encode_dict = json.load(f3)
+            taxonomy_list = taxonomy_string.split("|")
+            for taxon in taxonomy_list:
+                if accession in acc_dict[str(encode_dict[taxon])]:
+                    acc_dict[str(encode_dict[taxon])].remove(accession)
+                    acc_dict[str(encode_dict[taxon])].append(new_accession)
             with open(f'accession_map.json', "w+") as file:
-                json.dump(new_acc_dict, file)
-            return new_acc_dict
+                json.dump(acc_dict, file)
+            return acc_dict
         try:
             with open(f'adj_set.json', "r+") as f1:
                 adj_set = json.load(f1)
@@ -615,12 +599,13 @@ if __name__ == "__main__":
             if exists:
                 if id_check_new:
                     if not id_exists_new:
+                        tax = my_database.find_tax(old_id)
                         my_database.write_id(old_id, new_id)
                         my_logger.operation_type = "ch_header"
                         my_logger._valid_accession = old_id
                         my_logger._old_accession = old_id
                         my_logger._new_accession = new_id
-                        my_database.calculate_content(recalc_accessions=True)
+                        my_database.calculate_content(recalc_accessions=True, accession=old_id, new_accession=new_id, taxonomy_string=tax)
                         my_logger.update_log_dict()
                         my_logger.log_change()
                     else:

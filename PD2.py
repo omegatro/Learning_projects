@@ -161,8 +161,8 @@ class Database:
                     taxonomy_list = taxonomy_string.split("|")
                     for taxon in taxonomy_list:
                         count_dict[taxon] -= 1
+                        acc_dict[str(encode_dict[taxon])].remove(accession)
                         if count_dict[taxon] == 0:
-                            acc_dict[str(encode_dict[taxon])].remove(accession)
                             del count_dict[taxon]
                             for pair in list(adj_set):
                                 if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
@@ -642,8 +642,8 @@ if __name__ == "__main__":
         if id_check:
             if exists:
                 my_database.write_tax(id,new_tax)
-                my_database.calculate_content(old_tax, accession=id, reduce=True)
-                my_database.calculate_content(taxonomy_string=new_tax)
+                my_database.calculate_content(old_tax, accession=id, reduce=True)[2]
+                my_database.calculate_content(taxonomy_string=new_tax)[2]
                 my_logger.operation_type = "ch_tax"
                 my_logger._valid_accession = id
                 my_logger._old_taxonomy = old_tax

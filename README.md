@@ -44,7 +44,7 @@ pip install biopython plotly igraph pandas
 ```
 cp test_files/* ./
 ```
-- Creating a test database from by downloading sequences 
+- Creating a test database by downloading sequences 
 from https://www.ncbi.nlm.nih.gov/refseq/ and viewing the result
 ```
 python PD2.py --add-ncbi-list ncbi_headers.csv

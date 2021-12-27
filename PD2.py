@@ -142,16 +142,11 @@ class Database:
                             acc_dict[encode_dict[taxon]] = list(set(acc_dict[taxon] + new_accession))
 
                 else:
-                    taxonomy_list = taxonomy_string.split("|")
-                    for taxon in taxonomy_list:
-                        count_dict[taxon] -= 1
-                        acc_dict[str(encode_dict[taxon])].remove(accession)
-                        if count_dict[taxon] == 0:
-                            del count_dict[taxon]
-                            for pair in list(adj_set):
-                                if pair[0] == encode_dict[taxon] or pair[1] == encode_dict[taxon]:
-                                    adj_set.remove(pair)
-                            del encode_dict[taxon]
+                    os.remove('adj_set.json')
+                    os.remove('count_dict.json')
+                    os.remove('encode_dict.json')
+                    os.remove('accession_map.json')
+                    raise FileNotFoundError
                         
                 with open(f'adj_set.json', "w+") as file:
                         json.dump(list(adj_set), file)
@@ -191,7 +186,10 @@ class Database:
             for i in range(len(split_product.columns)):
                 for j in range(len(split_product.iloc[:,i])):
                     if i+1 != len(split_product.columns):
-                        adj_set.add((encode_dict[split_product.iloc[j,i]], encode_dict[split_product.iloc[j,i+1]]))
+                        if split_product.iloc[j,i] is None or split_product.iloc[j,i+1] is None:
+                            continue
+                        else:
+                            adj_set.add((encode_dict[split_product.iloc[j,i]], encode_dict[split_product.iloc[j,i+1]]))
             with open(f'adj_set.json', "w+") as file:
                 json.dump(list(adj_set), file)
             with open(f'count_dict.json', "w+") as file:

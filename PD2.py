@@ -23,7 +23,7 @@ class Interface:
             "--exp-fasta": f"Create a fasta file containing sequences from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--exp-meta": f"Create a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
             "--exp-records": f"Create a fasta file containing sequences & a csv file containing taxonomic information from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
-            "--rm-record": f"Remove records from local database based on a list of correct accession numbers provided as a file of {self.valid_input_type} format. Expected: path_to_{self.valid_input_type}",
+            "--rm-record": f"Remove records from local database if given correct accession number. Expected: valid_accession_number_from_local_db",
             "--ch-header": f"Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database. Expected: valid_accession_from_local_db,new_accession",
             "--ch-tax": f"Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database. Expected: valid_accession_from_local_db,new_taxonomy_string",
             "--view-data": "Visualize the contents of the local database as a tree chart, showing the number of records that belong to each taxonomic group."

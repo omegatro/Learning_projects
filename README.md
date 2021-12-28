@@ -31,7 +31,7 @@ pip install biopython plotly igraph pandas
   - Expected: path_to_csv
 - --rm-record: Remove records from local database if given correct accession number. 
   - Expected: valid_accession_number_from_local_db
-  - --ch-header: Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database 
+- --ch-header: Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database 
   - Expected: valid_accession_from_local_db,new_accession
 - --ch-tax: Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database 
   - Expected: valid_accession_from_local_dbnew_taxonomy_string

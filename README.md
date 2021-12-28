@@ -29,9 +29,9 @@ pip install biopython plotly igraph pandas
 - --exp-records: Create a fasta file containing sequences & a csv file containing taxonomic information from local database
      based on a list of correct accession numbers provided as a file of csv format 
   - Expected: path_to_csv
-- --rm-record: Remove records from local database if given correct accession number. Expected: valid_accession_number_from_local_db
-  - Expected: path_to_csv
-- --ch-header: Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database 
+- --rm-record: Remove records from local database if given correct accession number. 
+  - Expected: valid_accession_number_from_local_db
+  - --ch-header: Replace an accession number that exists in local database with user-provided accession number if provided accession number was found in local database 
   - Expected: valid_accession_from_local_db,new_accession
 - --ch-tax: Replace a taxonomy string that exists in local database with user-provided taxonomy string if provided accession number was found in local database 
   - Expected: valid_accession_from_local_dbnew_taxonomy_string

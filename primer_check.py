@@ -93,17 +93,35 @@ if args.fasta:
     sqdiff.to_csv(f"{str(args.fasta).replace('.fasta','')}_report.csv",header=True,index=False)
 
 
-# Visualize p values for all sequences in the original file
-if len(sqdiff["ref_id"].unique()) > 99:
-    pairs = ['aa', 'ac', 'ag', 'at', "cc", 'gc', 'ct', 'gt',  'tt','gg']
-    for id in sqdiff["ref_id"].unique():
-        df = sqdiff.loc[sqdiff["ref_id"] == id]
-        df["name_pairs"] = df["ref_id"]+"-"+df["split_id"]
-        df.set_index(["ref_id",'split_id'], inplace=True)
-        df.reset_index(drop=True,inplace=True)
-        df.set_index("name_pairs", inplace=True)
+    # Visualize p values for all sequences in the original file
+    if len(sqdiff["ref_id"].unique()) > 99:
+        pairs = ['aa', 'ac', 'ag', 'at', "cc", 'gc', 'ct', 'gt',  'tt','gg']
+        for id in sqdiff["ref_id"].unique():
+            df = sqdiff.loc[sqdiff["ref_id"] == id]
+            df["name_pairs"] = df["ref_id"]+"-"+df["split_id"]
+            df.set_index(["ref_id",'split_id'], inplace=True)
+            df.reset_index(drop=True,inplace=True)
+            df.set_index("name_pairs", inplace=True)
+            fig = go.Figure()
+            fig.add_trace(go.Surface(x=df.columns.tolist(), y=df.index.tolist(), z=df.values.tolist(), colorscale="Viridis", showscale = False))
+
+            # Update plot sizing
+            fig.update_layout(width=800,height=900,autosize=False,margin=dict(t=0, b=0, l=0, r=0),template="plotly_white",)
+
+            # Update 3D scene options
+            fig.update_scenes(aspectratio=dict(x=1, y=1, z=0.7),aspectmode="manual")
+
+            # Add dropdown
+            fig.update_layout(updatemenus=[dict(buttons=list([dict(args=["type", "surface"],label="3D Surface",method="restyle"),dict(args=["type", "heatmap"],label="Heatmap",method="restyle")]),
+                    direction="down", pad={"r": 10, "t": 10}, showactive=True, x=0.1, xanchor="left", y=1.1,yanchor="top"),])
+            fig.write_html(f'heatmap_{id}.html',full_html=False,include_plotlyjs='cdn')
+    else:
+        sqdiff["name_pairs"] = sqdiff["ref_id"]+"-"+sqdiff["split_id"]
+        sqdiff.set_index(["ref_id",'split_id'], inplace=True)
+        sqdiff.reset_index(drop=True,inplace=True)
+        sqdiff.set_index("name_pairs", inplace=True)
         fig = go.Figure()
-        fig.add_trace(go.Surface(x=df.columns.tolist(), y=df.index.tolist(), z=df.values.tolist(), colorscale="Viridis", showscale = False))
+        fig.add_trace(go.Surface(x=sqdiff.columns.tolist(), y=sqdiff.index.tolist(), z=sqdiff.values.tolist(), colorscale="Viridis", showscale = False))
 
         # Update plot sizing
         fig.update_layout(width=800,height=900,autosize=False,margin=dict(t=0, b=0, l=0, r=0),template="plotly_white",)
@@ -114,28 +132,9 @@ if len(sqdiff["ref_id"].unique()) > 99:
         # Add dropdown
         fig.update_layout(updatemenus=[dict(buttons=list([dict(args=["type", "surface"],label="3D Surface",method="restyle"),dict(args=["type", "heatmap"],label="Heatmap",method="restyle")]),
                 direction="down", pad={"r": 10, "t": 10}, showactive=True, x=0.1, xanchor="left", y=1.1,yanchor="top"),])
-        fig.write_html(f'heatmap_{id}.html',full_html=False,include_plotlyjs='cdn')
-else:
-    sqdiff["name_pairs"] = sqdiff["ref_id"]+"-"+sqdiff["split_id"]
-    sqdiff.set_index(["ref_id",'split_id'], inplace=True)
-    sqdiff.reset_index(drop=True,inplace=True)
-    sqdiff.set_index("name_pairs", inplace=True)
-    fig = go.Figure()
-    fig.add_trace(go.Surface(x=sqdiff.columns.tolist(), y=sqdiff.index.tolist(), z=sqdiff.values.tolist(), colorscale="Viridis", showscale = False))
-
-    # Update plot sizing
-    fig.update_layout(width=800,height=900,autosize=False,margin=dict(t=0, b=0, l=0, r=0),template="plotly_white",)
-
-    # Update 3D scene options
-    fig.update_scenes(aspectratio=dict(x=1, y=1, z=0.7),aspectmode="manual")
-
-    # Add dropdown
-    fig.update_layout(updatemenus=[dict(buttons=list([dict(args=["type", "surface"],label="3D Surface",method="restyle"),dict(args=["type", "heatmap"],label="Heatmap",method="restyle")]),
-            direction="down", pad={"r": 10, "t": 10}, showactive=True, x=0.1, xanchor="left", y=1.1,yanchor="top"),])
-    fig.write_html(f'heatmap.html',full_html=False,include_plotlyjs='cdn')
-    fig.show()
+        fig.write_html(f'heatmap.html',full_html=False,include_plotlyjs='cdn')
+        fig.show()
 # create figures
-    
     if args.split_images:
         sqdiff = pd.read_csv(f"{str(args.fasta).replace('.fasta','')}_report.csv")
         rcParams['figure.figsize'] = 30,0.46*len(sqdiff['ref_id'].unique())
@@ -149,16 +148,35 @@ else:
             plt.clf()
 
 if args.html:
-    sqdiff = pd.read_csv(args.html, header=0)
-    pairs = ['aa', 'ac', 'ag', 'at', "cc", 'gc', 'ct', 'gt',  'tt','gg']
-    for id in sqdiff["ref_id"].unique():
-        df = sqdiff.loc[sqdiff["ref_id"] == id]
-        df["name_pairs"] = df["ref_id"]+"-"+sqdiff["split_id"]
-        df.set_index(["ref_id",'split_id'], inplace=True)
-        df.reset_index(drop=True,inplace=True)
-        df.set_index("name_pairs", inplace=True)
+    sqdiff = pd.read_csv(args.html)
+    if len(sqdiff["ref_id"].unique()) > 99:
+        pairs = ['aa', 'ac', 'ag', 'at', "cc", 'gc', 'ct', 'gt',  'tt','gg']
+        for id in sqdiff["ref_id"].unique():
+            df = sqdiff.loc[sqdiff["ref_id"] == id]
+            df["name_pairs"] = df["ref_id"]+"-"+sqdiff["split_id"]
+            df.set_index(["ref_id",'split_id'], inplace=True)
+            df.reset_index(drop=True,inplace=True)
+            df.set_index("name_pairs", inplace=True)
+            fig = go.Figure()
+            fig.add_trace(go.Surface(x=df.columns.tolist(), y=df.index.tolist(), z=df.values.tolist(), colorscale="Viridis"))
+
+            # Update plot sizing
+            fig.update_layout(width=800,height=900,autosize=False,margin=dict(t=0, b=0, l=0, r=0),template="plotly_white",)
+
+            # Update 3D scene options
+            fig.update_scenes(aspectratio=dict(x=1, y=1, z=0.7),aspectmode="manual")
+
+            # Add dropdown
+            fig.update_layout(updatemenus=[dict(buttons=list([dict(args=["type", "surface"],label="3D Surface",method="restyle"),dict(args=["type", "heatmap"],label="Heatmap",method="restyle")]),
+                    direction="down", pad={"r": 10, "t": 10}, showactive=True, x=0.1, xanchor="left", y=1.1,yanchor="top"),])
+            fig.write_html(f'heatmap_{id}.html',full_html=False,include_plotlyjs='cdn')
+    else:
+        sqdiff["name_pairs"] = sqdiff["ref_id"]+"-"+sqdiff["split_id"]
+        sqdiff.set_index(["ref_id",'split_id'], inplace=True)
+        sqdiff.reset_index(drop=True,inplace=True)
+        sqdiff.set_index("name_pairs", inplace=True)
         fig = go.Figure()
-        fig.add_trace(go.Surface(x=df.columns.tolist(), y=df.index.tolist(), z=df.values.tolist(), colorscale="Viridis"))
+        fig.add_trace(go.Surface(x=sqdiff.columns.tolist(), y=sqdiff.index.tolist(), z=sqdiff.values.tolist(), colorscale="Viridis", showscale = False))
 
         # Update plot sizing
         fig.update_layout(width=800,height=900,autosize=False,margin=dict(t=0, b=0, l=0, r=0),template="plotly_white",)
@@ -169,7 +187,8 @@ if args.html:
         # Add dropdown
         fig.update_layout(updatemenus=[dict(buttons=list([dict(args=["type", "surface"],label="3D Surface",method="restyle"),dict(args=["type", "heatmap"],label="Heatmap",method="restyle")]),
                 direction="down", pad={"r": 10, "t": 10}, showactive=True, x=0.1, xanchor="left", y=1.1,yanchor="top"),])
-        fig.write_html(f'heatmap_{id}.html',full_html=False,include_plotlyjs='cdn')
+        fig.write_html(f'heatmap.html',full_html=False,include_plotlyjs='cdn')
+        fig.show()
 
     if args.split_images:
         sqdiff = pd.read_csv(args.html)

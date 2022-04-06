@@ -1,6 +1,6 @@
 from optparse import Values
 from Bio import SeqIO
-from itertools import combinations_with_replacement
+from itertools import product, combinations_with_replacement
 from scipy import stats
 from math import log10
 from matplotlib import rcParams
@@ -49,8 +49,11 @@ if args.fasta:
     #Generate all pairs of sequence ids (including self) - first sequence is used as ref in kmer sliding
     id_list = list(seqs.keys())
     id_dict = {id:{} for id in id_list}
-    combo_list = list(combinations_with_replacement(id_list, 2))
-
+    if len(id_list) < 99:
+        combo_list = list(combinations_with_replacement(id_list, 2))
+    else:
+        combo_list = list(product(id_list, repeat=2))
+        
     #For each sequence combination - slide 2-mers from the split sequence along the reference sequence and compute sums of one-hot encodings for each aligned base (use index sliding)
     def slide_twomer(reference,twomer):
         null_limit = 1.0000000000000001e-34

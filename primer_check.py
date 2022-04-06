@@ -1,7 +1,9 @@
+from optparse import Values
 from Bio import SeqIO
 from itertools import combinations_with_replacement
 from scipy import stats
 from math import log10
+from statistics import mean, stdev
 from matplotlib import rcParams
 import seaborn as sns, matplotlib.pyplot as plt
 import numpy as np, argparse, sys, pandas as pd,  plotly.graph_objects as go
@@ -52,6 +54,7 @@ if args.fasta:
 
     #For each sequence combination - slide 2-mers from the split sequence along the reference sequence and compute sums of one-hot encodings for each aligned base (use index sliding)
     def slide_twomer(reference,twomer):
+        null_limit = 1.0000000000000001e-34
         twomer_sum = np.asarray([0,0,0,0], dtype='object')
         for i,_ in enumerate(reference):
             if i == 0:
@@ -60,16 +63,16 @@ if args.fasta:
                 twomer_sum += 2*twomer[0]+reference[i-1]+twomer[-1]+2*reference[i]
             else:
                 twomer_sum += twomer[0]+reference[i]+twomer[-1]+reference[i-1]
-            aa_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([2,0.155,0.155,0.155])))
-            ac_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([1,1,0.31,0.31])))
-            ag_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([1,0.31,1,0.31])))
-            at_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([1,0.31,0.31,1])))
-            cc_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([0.155,2,0.155,0.155])))
-            gc_arg = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([0.31,1,1,0.31])))
-            ct_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([0.31,1,0.31,1])))
-            gt_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([0.31,0.31,1,1])))
-            gg_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([0.155,0.155,2,0.155])))
-            tt_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([0.155,0.155,0.155,2])))
+            aa_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([2,null_limit,null_limit,null_limit])))
+            ac_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([1,1,null_limit,null_limit])))
+            ag_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([1,null_limit,1,null_limit])))
+            at_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([1,null_limit,null_limit,1])))
+            cc_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([null_limit,2,null_limit,null_limit])))
+            gc_arg = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([null_limit,1,1,null_limit])))
+            ct_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([null_limit,1,null_limit,1])))
+            gt_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([null_limit,null_limit,1,1])))
+            gg_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([null_limit,null_limit,2,null_limit])))
+            tt_agr = np.sum(np.square(twomer_sum/np.amax(twomer_sum) - np.asarray([null_limit,null_limit,null_limit,2])))
         return {'aa':aa_agr,'ac':ac_agr,'ag':ag_agr,'at':at_agr,"cc":cc_agr,'gc':gc_arg,'ct':ct_agr,'gt':gt_agr, 'tt':tt_agr, 'gg':gg_agr}
 
     #Compute phred scored p values for all sequence combinations
@@ -85,6 +88,7 @@ if args.fasta:
             twomer_dict = slide_twomer(reference, twomer)
             for key in aggregate_sum.keys():
                 aggregate_sum[key] += twomer_dict[key]
+        
         aggregate_sum = {key:[-10*log10(stats.chi2.pdf(value/len(twomers),9))] for key,value in aggregate_sum.items()}
         aggregate_sum["ref_id"] = [ref_id]
         aggregate_sum["split_id"] = [twomer_id]
@@ -188,6 +192,7 @@ if args.html:
         fig.update_layout(updatemenus=[dict(buttons=list([dict(args=["type", "surface"],label="3D Surface",method="restyle"),dict(args=["type", "heatmap"],label="Heatmap",method="restyle")]),
                 direction="down", pad={"r": 10, "t": 10}, showactive=True, x=0.1, xanchor="left", y=1.1,yanchor="top"),])
         fig.write_html(f'heatmap.html',full_html=False,include_plotlyjs='cdn')
+        # fig.write_json(f'heatmap.json')
         fig.show()
 
     if args.split_images:

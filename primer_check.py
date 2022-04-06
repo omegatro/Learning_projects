@@ -3,7 +3,6 @@ from Bio import SeqIO
 from itertools import combinations_with_replacement
 from scipy import stats
 from math import log10
-from statistics import mean, stdev
 from matplotlib import rcParams
 import seaborn as sns, matplotlib.pyplot as plt
 import numpy as np, argparse, sys, pandas as pd,  plotly.graph_objects as go
